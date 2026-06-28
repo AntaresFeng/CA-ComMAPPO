@@ -6,8 +6,8 @@
 
 项目提供 `HighwayIntersectionMultiAgentEnv`，它是基于
 `gym.make("intersection-v1", ...)` 的 xuance `RawMultiAgentEnv` 适配器。
-通过 `controlled_vehicles` 可以控制 agent 数量，通过 `highway_config`
-可以自由配置 highway 环境参数。
+所有 highway 环境参数都通过 `highway_config` 配置，包括
+`controlled_vehicles`。
 
 ```python
 from argparse import Namespace
@@ -17,8 +17,8 @@ from ca_commappo.envs.highway_intersection import HighwayIntersectionMultiAgentE
 env = HighwayIntersectionMultiAgentEnv(
     Namespace(
         env_id="intersection-v1",
-        controlled_vehicles=4,
         highway_config={
+            "controlled_vehicles": 4,
             "duration": 20,
             "initial_vehicle_count": 12,
             "spawn_probability": 0.4,
@@ -61,8 +61,10 @@ envs = make_envs(
         parallels=1,
         vectorize="DummyVecMultiAgentEnv",
         distributed_training=False,
-        controlled_vehicles=4,
-        highway_config={"duration": 20},
+        highway_config={
+            "controlled_vehicles": 4,
+            "duration": 20,
+        },
     )
 )
 ```

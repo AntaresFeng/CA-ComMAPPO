@@ -10,9 +10,8 @@ multi-agent environment for MAPPO-style training.
 ## Requirements
 
 - The adapter must instantiate `gym.make("intersection-v1", ...)`.
-- The number of agents must be controlled by `controlled_vehicles`.
-- Users must be able to configure highway parameters through a `highway_config`
-  dictionary.
+- Users must be able to configure every highway parameter through a
+  `highway_config` dictionary, including `controlled_vehicles`.
 - The adapter must account for the `highway-env==1.11` shallow-update behavior:
   nested `observation` and `action` config dictionaries are replaced by
   `self.config.update(config)`, not recursively merged.
@@ -25,11 +24,13 @@ multi-agent environment for MAPPO-style training.
 ## Design
 
 Create a small package `ca_commappo` with a highway adapter module. The adapter
-will build a complete multi-agent `intersection-v1` config before calling
-`gym.make`, then deep-merge user `highway_config` into that complete config.
-This avoids relying on highway's shallow top-level merge for nested config.
+will build a complete multi-agent `intersection-v1` config from highway's own
+`IntersectionEnv.default_config()` and `MultiAgentIntersectionEnv.default_config()`
+before calling `gym.make`, then deep-merge user `highway_config` into that
+complete config. This avoids relying on highway's shallow top-level merge for
+nested config.
 
-The default multi-agent config will include:
+The default multi-agent config is derived from highway defaults and includes:
 
 - `controlled_vehicles`
 - `observation.type = "MultiAgentObservation"`
@@ -41,7 +42,8 @@ The default multi-agent config will include:
 
 User `highway_config` may override any of these fields, but the adapter will
 validate that the final observation and action spaces are `gymnasium.spaces.Tuple`
-and have the same length as `controlled_vehicles`.
+and have the same length as `highway_config["controlled_vehicles"]` or the
+highway default when that field is omitted.
 
 ## Data Mapping
 
@@ -67,7 +69,8 @@ Tests will cover:
 
 - Deep merge preserves required nested multi-agent defaults while allowing user
   overrides.
-- `controlled_vehicles=3` produces three agents and tuple spaces of length 3.
+- `highway_config={"controlled_vehicles": 3}` produces three agents and tuple
+  spaces of length 3.
 - `reset()` returns observation and info in xuance-compatible dict form.
 - `step()` accepts xuance action dicts and returns per-agent reward and
   termination dictionaries.

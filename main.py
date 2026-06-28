@@ -7,8 +7,8 @@ def main():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
             env_id="intersection-v1",
-            controlled_vehicles=3,
             highway_config={
+                "controlled_vehicles": 3,
                 "duration": 2,
                 "spawn_probability": 0.2,
             },

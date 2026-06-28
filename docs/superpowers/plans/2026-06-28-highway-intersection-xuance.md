@@ -40,8 +40,8 @@ from ca_commappo.envs.highway_intersection import (
 
 def test_build_config_deep_merges_highway_overrides():
     config = build_intersection_config(
-        controlled_vehicles=3,
-        highway_config={
+        {
+            "controlled_vehicles": 3,
             "duration": 7,
             "observation": {
                 "observation_config": {
@@ -70,7 +70,7 @@ def test_build_config_deep_merges_highway_overrides():
 
 def test_adapter_uses_intersection_v1_with_configurable_agent_count():
     env = HighwayIntersectionMultiAgentEnv(
-        Namespace(env_id="intersection-v1", controlled_vehicles=3, highway_config={})
+        Namespace(env_id="intersection-v1", highway_config={"controlled_vehicles": 3})
     )
 
     try:
@@ -112,7 +112,10 @@ Expected: 2 passed.
 ```python
 def test_reset_step_and_state_are_xuance_compatible():
     env = HighwayIntersectionMultiAgentEnv(
-        Namespace(env_id="intersection-v1", controlled_vehicles=3, highway_config={"duration": 2})
+        Namespace(
+            env_id="intersection-v1",
+            highway_config={"controlled_vehicles": 3, "duration": 2},
+        )
     )
 
     try:
@@ -176,8 +179,7 @@ def test_register_highway_intersection_env_with_xuance_make_envs():
             vectorize="DummyVecMultiAgentEnv",
             distributed_training=False,
             render_mode="rgb_array",
-            controlled_vehicles=2,
-            highway_config={"duration": 2},
+            highway_config={"controlled_vehicles": 2, "duration": 2},
         )
     )
 

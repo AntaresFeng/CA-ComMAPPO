@@ -7,6 +7,7 @@ import gymnasium as gym
 import highway_env  # noqa: F401 - importing registers highway-env ids.
 import numpy as np
 from gymnasium import spaces
+from highway_env.envs.intersection_env import IntersectionEnv, MultiAgentIntersectionEnv
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
 
@@ -23,8 +24,28 @@ def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, An
     return merged
 
 
+def _highway_multi_agent_intersection_defaults() -> dict[str, Any]:
+    intersection_config = IntersectionEnv.default_config()
+    multi_agent_config = MultiAgentIntersectionEnv.default_config()
+    config = _deep_merge(intersection_config, multi_agent_config)
+    config["observation"] = _deep_merge(
+        {
+            "type": multi_agent_config["observation"]["type"],
+            "observation_config": intersection_config["observation"],
+        },
+        multi_agent_config["observation"],
+    )
+    config["action"] = _deep_merge(
+        {
+            "type": multi_agent_config["action"]["type"],
+            "action_config": intersection_config["action"],
+        },
+        multi_agent_config["action"],
+    )
+    return config
+
+
 def build_intersection_config(
-    controlled_vehicles: int = 2,
     highway_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a complete multi-agent config for highway-env intersection-v1.
@@ -33,25 +54,11 @@ def build_intersection_config(
     adapter must create complete nested `observation` and `action` dictionaries
     before calling `gym.make`.
     """
-    if controlled_vehicles <= 0:
+    base_config = _highway_multi_agent_intersection_defaults()
+    config = _deep_merge(base_config, highway_config or {})
+    if int(config["controlled_vehicles"]) <= 0:
         raise ValueError("controlled_vehicles must be a positive integer")
-
-    base_config = {
-        "controlled_vehicles": controlled_vehicles,
-        "observation": {
-            "type": "MultiAgentObservation",
-            "observation_config": {"type": "Kinematics"},
-        },
-        "action": {
-            "type": "MultiAgentAction",
-            "action_config": {
-                "type": "DiscreteMetaAction",
-                "lateral": False,
-                "longitudinal": True,
-            },
-        },
-    }
-    return _deep_merge(base_config, highway_config or {})
+    return config
 
 
 class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
@@ -62,15 +69,8 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self.env_id = getattr(env_config, "env_id", "intersection-v1")
         self.render_mode = getattr(env_config, "render_mode", None)
         highway_config = getattr(env_config, "highway_config", None) or {}
-        controlled_vehicles = int(
-            getattr(
-                env_config,
-                "controlled_vehicles",
-                highway_config.get("controlled_vehicles", 2),
-            )
-        )
 
-        self.config = build_intersection_config(controlled_vehicles, highway_config)
+        self.config = build_intersection_config(highway_config)
         self.num_agents = int(self.config["controlled_vehicles"])
         self.agents = [f"agent_{i}" for i in range(self.num_agents)]
         self.agent_groups = [self.agents]
