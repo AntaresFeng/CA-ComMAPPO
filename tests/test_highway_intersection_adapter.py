@@ -60,7 +60,7 @@ def test_build_config_deep_merges_highway_overrides():
     assert config["action"]["action_config"]["target_speeds"] == [0, 5, 10]
 
 
-def test_adapter_uses_intersection_v1_with_configurable_agent_count():
+def test_adapter_uses_intersection_v1_with_configurable_agent_count_and_target_speeds():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
             env_id="intersection-v1",
@@ -76,19 +76,7 @@ def test_adapter_uses_intersection_v1_with_configurable_agent_count():
         assert isinstance(env.env.action_space, Tuple)
         assert len(env.env.observation_space.spaces) == 3
         assert len(env.env.action_space.spaces) == 3
-    finally:
-        env.close()
 
-
-def test_adapter_preserves_intersection_discrete_target_speeds():
-    env = HighwayIntersectionMultiAgentEnv(
-        Namespace(
-            env_id="intersection-v1",
-            highway_config={"controlled_vehicles": 3},
-        )
-    )
-
-    try:
         action_speeds = [
             action_type.target_speeds.tolist()
             for action_type in env.env.unwrapped.action_type.agents_action_types

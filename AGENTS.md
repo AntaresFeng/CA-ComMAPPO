@@ -6,7 +6,7 @@
 
 ## 本地运行方式
 
-这是本地实验研究仓库，代码和配置会频繁变动，不按完整项目发布流程管理。日常运行脚本时使用 `uv run` 即可，例如 `uv run python main.py`，或 `uv run python <your_script>.py`。不要把发布构建作为常规步骤；只有明确需要产物时才考虑。`uv run pytest -q` 只在重要代码改动、准备提交或需要验证适配器行为时运行。
+这是本地实验研究仓库，代码和配置会频繁变动，不按完整项目发布流程管理。日常运行脚本时使用 `uv run` 即可，例如 `uv run python main.py`，或 `uv run python <your_script>.py`。不要 `uv build`，不要把发布构建作为常规步骤；只有明确需要产物时才考虑。`uv run pytest -q` 只在重要代码改动、准备提交或需要验证适配器行为时运行。
 
 ## 代码风格与命名约定
 
@@ -23,3 +23,11 @@
 ## 配置提示
 
 所有 `highway-env` 选项应通过 `highway_config` 传入。处理嵌套的 `observation` 和 `action` 字典时要谨慎：本项目会在调用 `gym.make` 前进行深度合并，以保留必要默认值。
+
+## 资料源
+
+- [xuance GitHub 仓库](https://github.com/agi-brain/xuance): 最新最全，仓库里的 examples/mappo 已经放在本地，可参考
+
+- [xuance 中文文档](https://cn.xuance.org/): 可以参考，但更新不及时
+
+- [论文计划](./docs/thesis-planning.md): 全局规划，仅参考
