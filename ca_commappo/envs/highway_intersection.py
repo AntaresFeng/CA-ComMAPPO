@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from copy import deepcopy
 from typing import Any
 
@@ -145,10 +143,15 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
     def step(self, action_dict: dict[str, Any]):
         action_tuple = self._actions_to_tuple(action_dict)
-        observation, _reward, _terminated, truncated, info = self.env.step(action_tuple)
+        observation, _reward, terminated_global, truncated, info = self.env.step(
+            action_tuple
+        )
         obs_dict = self._tuple_to_agent_dict(observation)
         rewards = self._tuple_to_agent_dict(info["agents_rewards"])
         terminated = self._tuple_to_agent_dict(info["agents_terminated"])
+        info["global_terminated"] = bool(terminated_global)
+        if terminated_global:
+            terminated = {agent: True for agent in self.agents}
         self._remember_obs(obs_dict)
         return obs_dict, rewards, terminated, bool(truncated), info
 

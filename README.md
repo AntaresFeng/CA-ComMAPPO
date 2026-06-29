@@ -69,9 +69,17 @@ envs = make_envs(
 )
 ```
 
-运行快速检查：
+项目入口：
+
+```powershell
+uv run python main.py
+uv run python main.py debug --target wrapper --actions 1 --duration 2
+uv run python main.py sanity --policy random
+uv run python main.py smoke
+```
+
+运行回归测试：
 
 ```powershell
 uv run pytest -q
-uv run python main.py
 ```

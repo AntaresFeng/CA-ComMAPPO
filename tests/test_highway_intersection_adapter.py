@@ -120,6 +120,101 @@ def test_reset_step_and_state_are_xuance_compatible():
         env.close()
 
 
+def test_collision_global_termination_marks_all_agents_done():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_id="intersection-v1",
+            highway_config={
+                "controlled_vehicles": 3,
+                "duration": 13,
+                "initial_vehicle_count": 10,
+                "spawn_probability": 0.6,
+                "normalize_reward": False,
+            },
+        )
+    )
+
+    try:
+        env.reset(seed=3)
+        terminated = {agent: False for agent in env.agents}
+        step_info = {}
+
+        for _ in range(13):
+            _obs, _rewards, terminated, _truncated, step_info = env.step(
+                {agent: 1 for agent in env.agents}
+            )
+            if step_info["rewards"]["collision_reward"] > 0:
+                break
+
+        assert step_info["rewards"]["collision_reward"] > 0
+        assert all(terminated.values())
+    finally:
+        env.close()
+
+
+def test_arrival_rewards_and_termination_match_highway_info():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_id="intersection-v1",
+            highway_config={
+                "controlled_vehicles": 3,
+                "duration": 13,
+                "initial_vehicle_count": 10,
+                "spawn_probability": 0.6,
+                "normalize_reward": False,
+            },
+        )
+    )
+
+    try:
+        env.reset(seed=1)
+        partial_arrival = None
+        final_arrival = None
+
+        for _ in range(13):
+            _obs, rewards, terminated, truncated, step_info = env.step(
+                {agent: 1 for agent in env.agents}
+            )
+            arrived_ratio = step_info["rewards"]["arrived_reward"]
+            if 0 < arrived_ratio < 1 and partial_arrival is None:
+                partial_arrival = rewards, terminated, truncated, step_info
+            if step_info["global_terminated"]:
+                final_arrival = rewards, terminated, truncated, step_info
+                break
+
+        assert partial_arrival is not None
+        rewards, terminated, truncated, step_info = partial_arrival
+        assert not truncated
+        assert not step_info["global_terminated"]
+        assert step_info["agents_terminated"] == (False, True, True)
+        assert terminated == {
+            "agent_0": False,
+            "agent_1": True,
+            "agent_2": True,
+        }
+        assert (
+            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
+        )
+        assert step_info["agents_rewards"] == (1.0, 1, 1)
+
+        assert final_arrival is not None
+        rewards, terminated, truncated, step_info = final_arrival
+        assert not truncated
+        assert step_info["global_terminated"]
+        assert step_info["agents_terminated"] == (True, True, True)
+        assert terminated == {
+            "agent_0": True,
+            "agent_1": True,
+            "agent_2": True,
+        }
+        assert (
+            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
+        )
+        assert step_info["agents_rewards"] == (1, 1, 1)
+    finally:
+        env.close()
+
+
 def test_register_highway_intersection_env_with_xuance_make_envs():
     register_highway_intersection_env()
     envs = make_envs(
