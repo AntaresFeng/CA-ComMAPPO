@@ -8,8 +8,8 @@ Date: 2026-06-29
 
 也就是说，当前状态更接近：
 
-- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试。
-- 缺少：MAPPO 训练入口、专用配置、端到端训练烟测、评估指标脚本、随机/规则 sanity baseline、实验说明。
+- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试，以及 random / idle-only sanity baseline 基础版。
+- 缺少：MAPPO 训练入口、专用配置、端到端训练烟测、terminal agent 后续 transition 的 mask/reward 处理、评估指标脚本、实验说明。
 
 ## Current State
 
@@ -61,6 +61,23 @@ Date: 2026-06-29
    - `examples/mappo/mappo_football_configs/3v1.yaml`
 
    这些是 XuanCe MAPPO 示例，但还不是 highway intersection baseline。
+
+5. Random / idle-only sanity baseline
+
+   文件：
+
+   - `examples/random_highway_intersection.py`
+   - `examples/sanity/highway_intersection.yaml`
+   - `ca_commappo/evaluation/sanity_baselines.py`
+   - `tests/test_sanity_baselines.py`
+
+   已支持：
+
+   - `random` 策略：每个 agent 独立采样离散动作。
+   - `idle-only` 策略：所有 agent 固定动作 `1`，即 `IDLE`。
+   - 多 seed 配置。
+   - 输出 mean episode reward、mean per-agent reward、episode length、collision rate、arrival rate、truncation rate。
+   - 可选输出完整 JSON 结果。
 
 ## Missing Pieces
 
@@ -188,6 +205,27 @@ highway_config:
 
 这个检查不用于评估算法性能，只用于防止训练入口在真实长跑时才暴露接口问题。
 
+### 3.5 Terminal Agent 后续 Transition 的 Mask / Reward 处理
+
+当前 highway intersection 存在一个需要在 adapter 层明确处理的多智能体生命周期问题：
+
+- highway-env 的全局终止条件是任一受控车碰撞、所有受控车到达，或 `offroad_terminal=true` 时 ego 离路。
+- 单个受控车到达后，只要全局 episode 还没有结束，highway-env 仍会在后续 step 中为该车生成 observation、`agents_rewards` 和 `agents_terminated`。
+- 对已到达车辆，`IntersectionEnv._agent_reward()` 会持续返回 `arrived_reward`，默认值为 `1`；这不是一次性到达奖励，而是到达后每个后续 step 都可能继续得到 `1`。
+- XuanCe MAPPO 会把 `info["agent_mask"]` 存入 buffer，并在 actor、entropy、critic loss 中使用该 mask。`terminated` 主要用于 return / GAE 的 bootstrap 截断，不会自动把该 agent 后续 transition 从 loss 中排除。
+
+因此，terminal agent 后续 transition 应视为无效训练样本。当前 adapter 的 `agent_mask()` 一直返回全 True，会让已到达 agent 的后续动作、奖励和观测继续进入 MAPPO 训练，可能放大 arrived agent 的回报并污染 credit assignment。
+
+建议处理语义：
+
+- reset 时所有 agent active。
+- 每个 step 先记录 `active_before_step`，这个 mask 对应该 step 的 `obs_t/action_t/reward_t/terminated_t`，用于 XuanCe 的 `agent_mask`。
+- 如果某个 agent 在本 step 首次 `terminated=True`，保留这个 terminal transition 的奖励和 mask；从下一步开始该 agent 的 `agent_mask=False`。
+- terminal 后的 agent 后续 reward 应清零，或至少必须通过 `agent_mask=False` 从 MAPPO loss 中排除。
+- terminal 后动作可以忽略或替换为安全动作，例如 `IDLE`；不要简单把 `avail_actions` 全置 False，因为它是动作可用性 mask，不是 alive mask，且全 False 可能破坏离散策略分布。
+
+这部分需要补 adapter 测试，至少覆盖：单个 agent 到达但全局未结束时，到达当步仍保留有效 terminal transition，下一步开始 mask 为 False，后续 reward 不再累计到训练信号。
+
 ### 4. 评估指标脚本
 
 只看 average reward 不够支撑 highway intersection baseline。
@@ -218,21 +256,35 @@ highway_config:
 
 这些指标需要从 highway-env 的 `info`、车辆状态和 episode 结束原因中整理。第一版可以先只做 reward、collision、arrival、episode length。
 
-### 5. Random / Rule-based Sanity Baseline
+### 5. Random / Rule-based Sanity Baseline（基础版已完成）
 
-MAPPO baseline 之前应先有一个随机策略或简单规则策略，用来确认环境、奖励和指标统计是正常的。
+基础版已完成，不再是 MAPPO baseline 的阻塞缺口。
 
-建议新增：
+已具备：
 
-`examples/random_highway_intersection.py`
+- `examples/random_highway_intersection.py`
+- `examples/sanity/highway_intersection.yaml`
+- `ca_commappo/evaluation/sanity_baselines.py`
+- `tests/test_sanity_baselines.py`
 
-或集成到评估脚本中：
+已支持策略：
 
-- random：每个 agent 从 `env.action_space[agent].sample()` 采样。
+- random：每个 agent 独立采样离散动作。
 - idle-only：所有 agent 固定动作 `1`，即 `IDLE`。
-- cautious：接近冲突区时倾向 `SLOWER`，否则 `IDLE` 或 `FASTER`。这可以后续再做。
 
-第一版至少保留 random 和 idle-only。
+已支持统计：
+
+- mean episode reward
+- mean per-agent reward
+- mean episode length
+- collision rate
+- arrival rate
+- truncation rate
+
+后续仍可扩展：
+
+- cautious：接近冲突区时倾向 `SLOWER`，否则 `IDLE` 或 `FASTER`。
+- 将正式 random / idle-only 多 seed 结果归档为 CSV 或 JSON，作为 MAPPO 对照基线。
 
 ### 6. 实验协议和 README 说明
 
@@ -262,9 +314,9 @@ README 当前主要说明适配器用法，缺少 baseline 运行说明。
 
    目标不是性能，而是确认 `MAPPO_Agents` 初始化、采样、存 buffer、更新网络都不报错。
 
-4. 新增 random / idle-only baseline。
+4. 复跑并归档 random / idle-only baseline。
 
-   先建立指标下限，确认碰撞率和回报统计合理。
+   基础脚本已完成；下一步是用固定配置输出多 seed JSON 或 CSV，建立指标下限，并确认碰撞率和回报统计合理。
 
 5. 新增评估指标汇总脚本。
 
@@ -285,7 +337,7 @@ README 当前主要说明适配器用法，缺少 baseline 运行说明。
 - `uv run python examples/mappo/mappo_highway_intersection.py --env-id intersection_v1` 能启动训练。
 - 小步训练烟测能完成至少一次 policy update。
 - 有一份固定配置文件记录 highway 参数和 MAPPO 超参数。
-- 有 random 或 idle-only baseline 结果。
+- 能通过 `examples/random_highway_intersection.py` 产出 random / idle-only baseline 结果，并将正式对照结果归档。
 - 有 MAPPO 训练后评估结果。
 - 评估结果至少包含平均回报、碰撞率、通过率、episode length。
 - README 记录可复现实验命令。
@@ -293,5 +345,6 @@ README 当前主要说明适配器用法，缺少 baseline 运行说明。
 ## Notes
 
 - 当前适配器测试通过并不等价于 MAPPO baseline 完成；它只说明环境接口基本可用。
+- terminal agent 后续 transition 的 `agent_mask` 和 reward 语义必须在 adapter 层处理清楚；否则 MAPPO 可能继续训练已到达 agent 的无效样本。
 - highway-env 的 kinematics observation 对车辆顺序敏感，普通 MLP-MAPPO 应作为基础 baseline，但不是最终强 baseline。
 - 后续论文主线建议从 MAPPO-MLP 逐步扩展到 Attention-MAPPO，再扩展到显式通信与 conflict-aware communication。

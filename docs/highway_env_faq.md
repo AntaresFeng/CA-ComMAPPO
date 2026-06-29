@@ -1,5 +1,4 @@
 > https://highway-env.farama.org/faq/
->
 
 # Frequently Asked Questions
 
