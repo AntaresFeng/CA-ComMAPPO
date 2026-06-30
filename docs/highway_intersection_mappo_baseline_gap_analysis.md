@@ -1,6 +1,7 @@
 # Highway Intersection MAPPO Baseline Gap Analysis
 
 Date: 2026-06-29
+Updated: 2026-06-30
 
 ## Summary
 
@@ -46,11 +47,15 @@ Date: 2026-06-29
    - reset/step/state 的 XuanCe 兼容性。
    - `register_highway_intersection_env()` 可被 `xuance.environment.make_envs()` 使用。
 
-3. 冒烟入口
+3. 冒烟和诊断入口
 
    文件：`main.py`
 
    当前能创建 3-agent intersection 环境，reset 一次，采样动作 step 一次，并打印基础信息。
+
+   文件：`examples/debug_highway_env_episode.py`
+
+   当前可用于对比 raw highway-env 与 adapter wrapper 行为，并打印 wrapper 侧的 `agent_mask`、adapter-facing `agents_rewards` 和 highway-env 原始 `raw_agents_rewards`。
 
 4. 参考示例
 
@@ -208,7 +213,7 @@ highway_config:
 
 ### 3.5 Terminal Agent 后续 Transition 的 Mask / Reward 处理（已完成）
 
-状态：已在 adapter 层完成。`reset()` 时所有 agent active；每个 step 使用 `active_before_step` 作为本 transition 的 `agent_mask`；首次 terminal transition 保留 mask 和 reward；后续 step 中该 agent 的 mask 为 `False`，adapter-facing reward 为 `0.0`。highway-env 原始重复到达奖励保留在 `info["raw_agents_rewards"]` 中用于诊断。
+状态：已在 adapter 层完成，并通过 adapter 测试和 wrapper debug episode 验证。`reset()` 时所有 agent active；每个 step 使用 `active_before_step` 作为本 transition 的 `agent_mask`；首次 terminal transition 保留 mask 和 reward；后续 step 中该 agent 的 mask 为 `False`，adapter-facing reward 为 `0.0`。highway-env 原始重复到达奖励保留在 `info["raw_agents_rewards"]` 中用于诊断。
 
 当前 highway intersection 存在一个需要在 adapter 层明确处理的多智能体生命周期问题：
 
@@ -217,7 +222,7 @@ highway_config:
 - 对已到达车辆，`IntersectionEnv._agent_reward()` 会持续返回 `arrived_reward`，默认值为 `1`；这不是一次性到达奖励，而是到达后每个后续 step 都可能继续得到 `1`。
 - XuanCe MAPPO 会把 `info["agent_mask"]` 存入 buffer，并在 actor、entropy、critic loss 中使用该 mask。`terminated` 主要用于 return / GAE 的 bootstrap 截断，不会自动把该 agent 后续 transition 从 loss 中排除。
 
-因此，terminal agent 后续 transition 应视为无效训练样本。当前 adapter 的 `agent_mask()` 一直返回全 True，会让已到达 agent 的后续动作、奖励和观测继续进入 MAPPO 训练，可能放大 arrived agent 的回报并污染 credit assignment。
+因此，terminal agent 后续 transition 应视为无效训练样本。旧 adapter 的 `agent_mask()` 一直返回全 True，会让已到达 agent 的后续动作、奖励和观测继续进入 MAPPO 训练，可能放大 arrived agent 的回报并污染 credit assignment；当前实现已修正这一点。
 
 建议处理语义：
 
@@ -228,6 +233,18 @@ highway_config:
 - terminal 后动作可以忽略或替换为安全动作，例如 `IDLE`；不要简单把 `avail_actions` 全置 False，因为它是动作可用性 mask，不是 alive mask，且全 False 可能破坏离散策略分布。
 
 这部分已有 adapter 测试覆盖：单个 agent 到达但全局未结束时，到达当步仍保留有效 terminal transition，下一步开始 mask 为 False，后续 reward 不再累计到训练信号。
+
+端到端诊断命令：
+
+```bash
+uv run python examples/debug_highway_env_episode.py --target wrapper --render-mode rgb_array
+```
+
+在 `arrived_reward=5`、2-agent wrapper 诊断 episode 中，已观测到以下关键语义：
+
+- 首次到达步：terminal agent 的 adapter-facing reward 保留为 `5`，`raw_agents_rewards` 也为 `5`，`agent_mask` 仍为 `True`，用于保留该 terminal transition。
+- 到达后的后续步：terminal agent 的 adapter-facing reward 为 `0.0`，`agent_mask=False`，而 `raw_agents_rewards` 仍显示 highway-env 原始重复到达奖励 `5`。
+- terminal 后如果上层仍传入该 agent 的动作，adapter 会在传给 highway-env 前替换为安全动作 `IDLE=1`；`avail_actions` 不被置空。
 
 ### 4. 评估指标脚本
 
