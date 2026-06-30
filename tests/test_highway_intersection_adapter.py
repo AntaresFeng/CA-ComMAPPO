@@ -196,6 +196,7 @@ def test_arrival_rewards_and_termination_match_highway_info():
             tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
         )
         assert step_info["agents_rewards"] == (1.0, 1, 1)
+        assert step_info["raw_agents_rewards"] == (1.0, 1, 1)
 
         assert final_arrival is not None
         rewards, terminated, truncated, step_info = final_arrival
@@ -210,7 +211,58 @@ def test_arrival_rewards_and_termination_match_highway_info():
         assert (
             tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
         )
-        assert step_info["agents_rewards"] == (1, 1, 1)
+        assert step_info["agents_rewards"] == (1, 0.0, 0.0)
+        assert step_info["raw_agents_rewards"] == (1, 1, 1)
+    finally:
+        env.close()
+
+
+def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_id="intersection-v1",
+            highway_config={
+                "controlled_vehicles": 3,
+                "duration": 13,
+                "initial_vehicle_count": 10,
+                "spawn_probability": 0.6,
+                "normalize_reward": False,
+            },
+        )
+    )
+
+    try:
+        env.reset(seed=1)
+        partial_arrival = None
+
+        for _ in range(13):
+            _obs, _rewards, terminated, _truncated, step_info = env.step(
+                {agent: 1 for agent in env.agents}
+            )
+            if 0 < step_info["rewards"]["arrived_reward"] < 1:
+                partial_arrival = terminated, env.agent_mask()
+                break
+
+        assert partial_arrival is not None
+        terminated, agent_mask = partial_arrival
+        assert terminated == {
+            "agent_0": False,
+            "agent_1": True,
+            "agent_2": True,
+        }
+        assert agent_mask == {agent: True for agent in env.agents}
+
+        _obs, rewards, _terminated, _truncated, _step_info = env.step(
+            {agent: 1 for agent in env.agents}
+        )
+
+        assert env.agent_mask() == {
+            "agent_0": True,
+            "agent_1": False,
+            "agent_2": False,
+        }
+        assert rewards["agent_1"] == 0.0
+        assert rewards["agent_2"] == 0.0
     finally:
         env.close()
 

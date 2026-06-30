@@ -10,6 +10,7 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
 
 DEFAULT_ENV_NAME = "HighwayIntersection"
+IDLE_ACTION = 1
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -89,6 +90,8 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self.max_episode_steps = self._max_episode_steps()
         self._last_obs: dict[str, np.ndarray] | None = None
         self._initial_seed = getattr(env_config, "env_seed", None)
+        self._active_agents = self._all_agents_active()
+        self._last_agent_mask = self._all_agents_active()
 
     def _validate_multi_agent_spaces(self) -> None:
         if not isinstance(self.env.observation_space, spaces.Tuple):
@@ -122,11 +125,37 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
     def _tuple_to_agent_dict(self, values: tuple[Any, ...]) -> dict[str, Any]:
         return {agent: values[i] for i, agent in enumerate(self.agents)}
 
-    def _actions_to_tuple(self, action_dict: dict[str, Any]) -> tuple[Any, ...]:
-        missing = [agent for agent in self.agents if agent not in action_dict]
+    def _all_agents_active(self) -> dict[str, bool]:
+        return {agent: True for agent in self.agents}
+
+    def _actions_to_tuple(
+        self,
+        action_dict: dict[str, Any],
+        active_agents: dict[str, bool] | None = None,
+    ) -> tuple[Any, ...]:
+        if active_agents is None:
+            active_agents = self._all_agents_active()
+        missing = [
+            agent
+            for agent in self.agents
+            if active_agents[agent] and agent not in action_dict
+        ]
         if missing:
             raise KeyError(f"Missing actions for agents: {missing}")
-        return tuple(action_dict[agent] for agent in self.agents)
+        return tuple(
+            action_dict[agent] if active_agents[agent] else IDLE_ACTION
+            for agent in self.agents
+        )
+
+    def _mask_rewards(
+        self,
+        rewards: dict[str, Any],
+        active_agents: dict[str, bool],
+    ) -> dict[str, Any]:
+        return {
+            agent: rewards[agent] if active_agents[agent] else 0.0
+            for agent in self.agents
+        }
 
     def _remember_obs(self, obs: dict[str, Any]) -> None:
         self._last_obs = {
@@ -138,20 +167,31 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             kwargs["seed"] = self._initial_seed
         observation, _info = self.env.reset(**kwargs)
         obs_dict = self._tuple_to_agent_dict(observation)
+        self._active_agents = self._all_agents_active()
+        self._last_agent_mask = self._all_agents_active()
         self._remember_obs(obs_dict)
         return obs_dict, {}
 
     def step(self, action_dict: dict[str, Any]):
-        action_tuple = self._actions_to_tuple(action_dict)
+        active_before_step = dict(self._active_agents)
+        action_tuple = self._actions_to_tuple(action_dict, active_before_step)
         observation, _reward, terminated_global, truncated, info = self.env.step(
             action_tuple
         )
         obs_dict = self._tuple_to_agent_dict(observation)
-        rewards = self._tuple_to_agent_dict(info["agents_rewards"])
+        raw_rewards = self._tuple_to_agent_dict(info["agents_rewards"])
+        rewards = self._mask_rewards(raw_rewards, active_before_step)
         terminated = self._tuple_to_agent_dict(info["agents_terminated"])
         info["global_terminated"] = bool(terminated_global)
         if terminated_global:
             terminated = {agent: True for agent in self.agents}
+        info["raw_agents_rewards"] = tuple(raw_rewards[agent] for agent in self.agents)
+        info["agents_rewards"] = tuple(rewards[agent] for agent in self.agents)
+        self._last_agent_mask = active_before_step
+        self._active_agents = {
+            agent: active_before_step[agent] and not bool(terminated[agent])
+            for agent in self.agents
+        }
         self._remember_obs(obs_dict)
         return obs_dict, rewards, terminated, bool(truncated), info
 
@@ -163,7 +203,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         ).astype(np.float32)
 
     def agent_mask(self):
-        return {agent: True for agent in self.agents}
+        return dict(self._last_agent_mask)
 
     def avail_actions(self):
         actions = {}

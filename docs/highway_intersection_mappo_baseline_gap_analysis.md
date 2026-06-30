@@ -8,8 +8,8 @@ Date: 2026-06-29
 
 也就是说，当前状态更接近：
 
-- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试，以及 random / idle-only sanity baseline 基础版。
-- 缺少：MAPPO 训练入口、专用配置、端到端训练烟测、terminal agent 后续 transition 的 mask/reward 处理、评估指标脚本、实验说明。
+- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试、terminal agent 后续 transition 的 mask/reward 处理，以及 random / idle-only sanity baseline 基础版。
+- 缺少：MAPPO 训练入口、专用配置、端到端训练烟测、评估指标脚本、实验说明。
 
 ## Current State
 
@@ -32,6 +32,7 @@ Date: 2026-06-29
    - 将 `info["agents_rewards"]` 和 `info["agents_terminated"]` 转成 per-agent dict。
    - 提供 `state()`、`agent_mask()`、`avail_actions()`、`render()`、`close()`。
    - 在调用 highway-env 前深度合并 `highway_config`，避免 highway-env 1.11 的浅合并覆盖嵌套配置。
+   - 已到达或已终止 agent 的后续 transition 会通过 `agent_mask=False` 排除，并将后续 adapter-facing reward 清零。
 
 2. 适配器测试
 
@@ -205,7 +206,9 @@ highway_config:
 
 这个检查不用于评估算法性能，只用于防止训练入口在真实长跑时才暴露接口问题。
 
-### 3.5 Terminal Agent 后续 Transition 的 Mask / Reward 处理
+### 3.5 Terminal Agent 后续 Transition 的 Mask / Reward 处理（已完成）
+
+状态：已在 adapter 层完成。`reset()` 时所有 agent active；每个 step 使用 `active_before_step` 作为本 transition 的 `agent_mask`；首次 terminal transition 保留 mask 和 reward；后续 step 中该 agent 的 mask 为 `False`，adapter-facing reward 为 `0.0`。highway-env 原始重复到达奖励保留在 `info["raw_agents_rewards"]` 中用于诊断。
 
 当前 highway intersection 存在一个需要在 adapter 层明确处理的多智能体生命周期问题：
 
@@ -224,7 +227,7 @@ highway_config:
 - terminal 后的 agent 后续 reward 应清零，或至少必须通过 `agent_mask=False` 从 MAPPO loss 中排除。
 - terminal 后动作可以忽略或替换为安全动作，例如 `IDLE`；不要简单把 `avail_actions` 全置 False，因为它是动作可用性 mask，不是 alive mask，且全 False 可能破坏离散策略分布。
 
-这部分需要补 adapter 测试，至少覆盖：单个 agent 到达但全局未结束时，到达当步仍保留有效 terminal transition，下一步开始 mask 为 False，后续 reward 不再累计到训练信号。
+这部分已有 adapter 测试覆盖：单个 agent 到达但全局未结束时，到达当步仍保留有效 terminal transition，下一步开始 mask 为 False，后续 reward 不再累计到训练信号。
 
 ### 4. 评估指标脚本
 
@@ -345,6 +348,6 @@ README 当前主要说明适配器用法，缺少 baseline 运行说明。
 ## Notes
 
 - 当前适配器测试通过并不等价于 MAPPO baseline 完成；它只说明环境接口基本可用。
-- terminal agent 后续 transition 的 `agent_mask` 和 reward 语义必须在 adapter 层处理清楚；否则 MAPPO 可能继续训练已到达 agent 的无效样本。
+- terminal agent 后续 transition 的 `agent_mask` 和 reward 语义已在 adapter 层处理；后续 MAPPO runner 应继续确认 XuanCe buffer 中使用的是 adapter 提供的 mask/reward。
 - highway-env 的 kinematics observation 对车辆顺序敏感，普通 MLP-MAPPO 应作为基础 baseline，但不是最终强 baseline。
 - 后续论文主线建议从 MAPPO-MLP 逐步扩展到 Attention-MAPPO，再扩展到显式通信与 conflict-aware communication。
