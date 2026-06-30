@@ -22,6 +22,8 @@ DEFAULT_HIGHWAY_CONFIG = {
     "controlled_vehicles": 2,
     "duration": 15,
     "spawn_probability": 0.6,
+    "arrived_reward": 5,
+    "collision_reward": -10,
 }
 
 
@@ -299,11 +301,7 @@ def print_run_header(
     print(f"target={args.target}")
     print(f"env_id={args.env_id}")
     print(f"episode_seed={args.seed}")
-    print(
-        "action="
-        f"{args.action}"
-        f" action_seed={effective_action_seed(args)}"
-    )
+    print(f"action={args.action} action_seed={effective_action_seed(args)}")
     print(f"max_steps={max_steps}")
     print(f"highway_config={json.dumps(highway_config, sort_keys=True)}")
     print(f"first_actions={action_plan[: min(5, len(action_plan))]}")
@@ -408,6 +406,7 @@ def run_wrapper_episode(
                 info=info,
                 obs=obs,
                 print_observations=args.print_observations,
+                agent_mask=tuple(bool(env.agent_mask()[agent]) for agent in env.agents),
                 state=env.state(),
             )
             maybe_render(env, args)
@@ -485,6 +484,7 @@ def print_step(
     info: dict[str, Any],
     obs: Any,
     print_observations: bool,
+    agent_mask: tuple[Any, ...] | None = None,
     state: np.ndarray | None = None,
 ) -> None:
     print(f"[{target}] step={step_index:03d}")
@@ -495,6 +495,8 @@ def print_step(
         f"agents={tuple(bool(value) for value in terminated)} "
         f"global={global_terminated} truncated={truncated}"
     )
+    if agent_mask is not None:
+        print(f"  mask={tuple(bool(value) for value in agent_mask)}")
     print(f"  info={format_info(info)}")
     print(f"  obs={format_obs(obs, print_observations)}")
     if state is not None:
@@ -537,6 +539,7 @@ def format_info(info: dict[str, Any]) -> str:
         "action",
         "rewards",
         "agents_rewards",
+        "raw_agents_rewards",
         "agents_terminated",
         "global_terminated",
     ]
