@@ -241,8 +241,9 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             actions[agent] = np.ones(action_space.n, dtype=np.bool_)
         return actions
 
-    def render(self, *args, **kwargs):
-        return self.env.render(*args, **kwargs)
+    def render(self, *_args, **_kwargs):
+        # XuanCe passes render_mode here, but gymnasium fixes it in gym.make().
+        return self.env.render()
 
     def close(self):
         return self.env.close()

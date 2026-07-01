@@ -326,3 +326,21 @@ def test_register_highway_intersection_env_with_xuance_make_envs():
         assert envs.num_agents == 2
     finally:
         envs.close()
+
+
+def test_render_accepts_xuance_render_mode_argument():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_id="intersection-v1",
+            render_mode="rgb_array",
+            highway_config={"controlled_vehicles": 2, "duration": 2},
+        )
+    )
+
+    try:
+        env.reset(seed=0)
+        image = env.render("rgb_array")
+
+        assert image is not None
+    finally:
+        env.close()
