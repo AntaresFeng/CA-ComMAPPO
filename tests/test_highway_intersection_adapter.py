@@ -120,6 +120,43 @@ def test_reset_step_and_state_are_xuance_compatible():
         env.close()
 
 
+def test_flatten_observations_option_exposes_one_dimensional_spaces_and_obs():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_id="intersection-v1",
+            flatten_observations=True,
+            highway_config={
+                "controlled_vehicles": 2,
+                "observation": {
+                    "observation_config": {
+                        "vehicles_count": 15,
+                        "features": [
+                            "presence",
+                            "x",
+                            "y",
+                            "vx",
+                            "vy",
+                            "cos_h",
+                            "sin_h",
+                        ],
+                    }
+                },
+            },
+        )
+    )
+
+    try:
+        assert env.observation_space["agent_0"].shape == (105,)
+        assert env.observation_space["agent_1"].shape == (105,)
+
+        obs, _info = env.reset(seed=0)
+        assert obs["agent_0"].shape == (105,)
+        assert obs["agent_1"].shape == (105,)
+        assert env.state().shape == (210,)
+    finally:
+        env.close()
+
+
 def test_collision_global_termination_marks_all_agents_done():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(

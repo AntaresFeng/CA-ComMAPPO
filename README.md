@@ -9,10 +9,10 @@
 - 适配器 reset / step / state 测试。
 - random / idle-only sanity baseline 和基础评估指标。
 - 本地 vendored XuanCe `examples/mappo` 参考脚本。
+- highway intersection MAPPO 小参数训练入口和 YAML 配置，用于端到端训练链路烟测。
 
-当前还不等价于完整 MAPPO baseline。缺口主要是 highway 专用 MAPPO
-训练入口、YAML 配置、小步端到端训练烟测、训练后评估脚本，以及 terminal
-agent 后续 transition 的 mask / reward 语义处理。细节见
+当前还不等价于完整 MAPPO baseline。缺口主要是正式多 seed 训练、
+训练后评估脚本、结果归档和 README 复现实验协议。细节见
 [`docs/highway_intersection_mappo_baseline_gap_analysis.md`](docs/highway_intersection_mappo_baseline_gap_analysis.md)。
 
 ## 本地运行
@@ -33,6 +33,12 @@ uv run python examples/random_highway_intersection.py --config examples/sanity/h
 uv run python examples/random_highway_intersection.py --config examples/sanity/highway_intersection.yaml --policy all --output results/sanity_highway.json
 ```
 
+运行 highway MAPPO 小步训练烟测：
+
+```powershell
+uv run python examples/mappo/mappo_highway_intersection.py --env-id intersection_v1 --mode train --no-save
+```
+
 只在修改适配器核心逻辑、排查回归或准备提交时运行测试：
 
 ```powershell
@@ -50,6 +56,8 @@ uv run pytest -q
 - `examples/debug_highway_env_episode.py`: raw / wrapper 环境调试入口。
 - `examples/sanity/highway_intersection.yaml`: 默认 sanity baseline 配置。
 - `examples/mappo/`: 本地保存的 XuanCe MAPPO 参考示例；当前不是 highway baseline。
+- `examples/mappo/mappo_highway_intersection.py`: highway intersection MAPPO 训练入口。
+- `examples/mappo/mappo_highway_configs/intersection_v1.yaml`: 小参数 MAPPO 训练配置。
 - `tests/`: 适配器、入口和 sanity baseline 测试。
 - `docs/`: 设计说明、排查记录和 baseline 缺口分析。
 

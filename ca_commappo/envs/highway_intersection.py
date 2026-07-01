@@ -67,6 +67,9 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         super().__init__()
         self.env_id = getattr(env_config, "env_id", "intersection-v1")
         self.render_mode = getattr(env_config, "render_mode", None)
+        self.flatten_observations = bool(
+            getattr(env_config, "flatten_observations", False)
+        )
         highway_config = getattr(env_config, "highway_config", None) or {}
 
         self.config = build_intersection_config(highway_config)
@@ -78,10 +81,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         )
         self._validate_multi_agent_spaces()
 
-        self.observation_space = {
-            agent: self.env.observation_space.spaces[i]
-            for i, agent in enumerate(self.agents)
-        }
+        self.observation_space = self._build_observation_space()
         self.action_space = {
             agent: self.env.action_space.spaces[i]
             for i, agent in enumerate(self.agents)
@@ -113,9 +113,27 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
     def _build_state_space(self) -> spaces.Box:
         flat_dim = sum(
-            int(np.prod(space.shape)) for space in self.env.observation_space.spaces
+            int(np.prod(space.shape)) for space in self.observation_space.values()
         )
         return spaces.Box(-np.inf, np.inf, shape=(flat_dim,), dtype=np.float32)
+
+    def _build_observation_space(self) -> dict[str, spaces.Space]:
+        observation_space = {}
+        for i, agent in enumerate(self.agents):
+            space = self.env.observation_space.spaces[i]
+            if self.flatten_observations:
+                space = self._flatten_box_space(space)
+            observation_space[agent] = space
+        return observation_space
+
+    def _flatten_box_space(self, space: spaces.Space) -> spaces.Box:
+        if not isinstance(space, spaces.Box):
+            raise ValueError("flatten_observations requires Box observation spaces")
+        return spaces.Box(
+            low=np.asarray(space.low, dtype=np.float32).reshape(-1),
+            high=np.asarray(space.high, dtype=np.float32).reshape(-1),
+            dtype=np.float32,
+        )
 
     def _max_episode_steps(self) -> int:
         duration = float(self.env.unwrapped.config.get("duration", 1))
@@ -124,6 +142,15 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
     def _tuple_to_agent_dict(self, values: tuple[Any, ...]) -> dict[str, Any]:
         return {agent: values[i] for i, agent in enumerate(self.agents)}
+
+    def _obs_tuple_to_agent_dict(
+        self, values: tuple[Any, ...]
+    ) -> dict[str, np.ndarray]:
+        obs = {}
+        for i, agent in enumerate(self.agents):
+            value = np.asarray(values[i], dtype=np.float32)
+            obs[agent] = value.reshape(-1) if self.flatten_observations else value
+        return obs
 
     def _all_agents_active(self) -> dict[str, bool]:
         return {agent: True for agent in self.agents}
@@ -166,7 +193,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         if "seed" not in kwargs and self._initial_seed is not None:
             kwargs["seed"] = self._initial_seed
         observation, _info = self.env.reset(**kwargs)
-        obs_dict = self._tuple_to_agent_dict(observation)
+        obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
         self._remember_obs(obs_dict)
@@ -178,7 +205,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         observation, _reward, terminated_global, truncated, info = self.env.step(
             action_tuple
         )
-        obs_dict = self._tuple_to_agent_dict(observation)
+        obs_dict = self._obs_tuple_to_agent_dict(observation)
         raw_rewards = self._tuple_to_agent_dict(info["agents_rewards"])
         rewards = self._mask_rewards(raw_rewards, active_before_step)
         terminated = self._tuple_to_agent_dict(info["agents_terminated"])
