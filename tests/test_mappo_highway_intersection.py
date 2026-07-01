@@ -31,6 +31,15 @@ def test_highway_mappo_config_uses_small_discrete_dummy_defaults():
     assert highway_config["action"]["action_config"]["target_speeds"] == [0, 4.5, 9]
 
 
+def test_highway_mappo_config_includes_xuance_learner_required_fields():
+    config = load_yaml(file_dir=str(CONFIG_PATH))
+
+    assert config["learning_rate"] == 0.0003
+    assert config["weight_decay"] == 0
+    assert config["use_linear_lr_decay"] is False
+    assert config["end_factor_lr_decay"] == 0.5
+
+
 def test_load_configs_resolves_highway_yaml_and_applies_cli_overrides():
     from examples.mappo import mappo_highway_intersection
 

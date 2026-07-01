@@ -1,7 +1,7 @@
 # Highway Intersection MAPPO Baseline Gap Analysis
 
 Date: 2026-06-29
-Updated: 2026-06-30
+Updated: 2026-07-01
 
 ## Summary
 
@@ -10,7 +10,7 @@ Updated: 2026-06-30
 也就是说，当前状态更接近：
 
 - 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试、terminal agent 后续 transition 的 mask/reward 处理、random / idle-only sanity baseline 基础版，以及 highway MAPPO 小参数 runner/config。
-- 缺少：自动化端到端训练烟测、训练后评估指标脚本、正式多 seed 训练结果归档和实验说明。
+- 缺少：训练后评估指标脚本、正式多 seed 训练结果归档和实验说明。
 
 ## Current State
 
@@ -165,12 +165,15 @@ buffer_size: 8
 n_epochs: 1
 n_minibatch: 1
 learning_rate: 0.0003
+weight_decay: 0
 gamma: 0.99
 gae_lambda: 0.95
 clip_range: 0.2
 vf_coef: 0.5
 ent_coef: 0.01
 
+use_linear_lr_decay: false
+end_factor_lr_decay: 0.5
 use_value_clip: true
 value_clip_range: 0.2
 use_value_norm: true
@@ -215,9 +218,18 @@ highway_config:
 
 ### 3. 端到端训练烟测
 
-当前测试只证明环境能被 `make_envs()` 创建，还没有证明 XuanCe 的 `MAPPO_Agents` 能完成初始化和训练循环。
+状态：基础版已完成。当前最小训练命令已经证明 XuanCe 的 `MAPPO_Agents`
+可以完成初始化、采样、写入 on-policy buffer，并执行至少一次网络更新。
 
-需要一个很小的端到端检查，可以是脚本或测试：
+已验证命令：
+
+```bash
+uv run python examples/mappo/mappo_highway_intersection.py --env-id intersection_v1 --mode train --running-steps 8 --buffer-size 4 --parallels 1 --n-epochs 1 --n-minibatch 1 --no-save
+```
+
+该命令完成后会打印 `Finish training.`。这仍然只是接口和训练链路烟测，不用于评价算法性能。
+
+这个很小的端到端检查覆盖：
 
 - 创建 1-2 个并行环境。
 - `buffer_size` 设置得很小，例如 8 或 16。
@@ -226,7 +238,9 @@ highway_config:
 - 调用一次 `Agents.train(...)` 或 `Agents.run_episodes(...)` + `Agents.train_epochs(...)`。
 - 确认没有 shape、dtype、action 类型、state 类型错误。
 
-这个检查不用于评估算法性能，只用于防止训练入口在真实长跑时才暴露接口问题。
+配置层面还通过 `tests/test_mappo_highway_intersection.py` 检查了 `weight_decay`、
+`use_linear_lr_decay` 和 `end_factor_lr_decay` 等 XuanCe learner 初始化必需字段，
+避免再次出现训练入口启动后才暴露的配置缺口。
 
 ### 3.5 Terminal Agent 后续 Transition 的 Mask / Reward 处理（已完成）
 
@@ -347,7 +361,7 @@ README 当前主要说明适配器用法，缺少 baseline 运行说明。
 
    直接参考 `examples/mappo/mappo_simple_spread.py`，但必须注册 `HighwayIntersection`，并使用离散动作对应的 `Categorical_MAAC_Policy`。
 
-3. 跑端到端小步训练烟测。
+3. 跑端到端小步训练烟测。（已完成基础版）
 
    目标不是性能，而是确认 `MAPPO_Agents` 初始化、采样、存 buffer、更新网络都不报错。
 

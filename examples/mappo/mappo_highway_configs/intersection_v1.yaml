@@ -34,12 +34,15 @@ buffer_size: 8
 n_epochs: 1
 n_minibatch: 1
 learning_rate: 0.0003
+weight_decay: 0
 gamma: 0.99
 gae_lambda: 0.95
 clip_range: 0.2
 vf_coef: 0.5
 ent_coef: 0.01
 
+use_linear_lr_decay: false
+end_factor_lr_decay: 0.5
 use_value_clip: true
 value_clip_range: 0.2
 use_value_norm: true
