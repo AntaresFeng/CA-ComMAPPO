@@ -22,6 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--env-id", type=str, default=DEFAULT_ENV_ID)
     parser.add_argument(
+        "--config",
+        type=str,
+        default="",
+        help="Optional YAML config path. Empty value uses the built-in --env-id config.",
+    )
+    parser.add_argument(
         "--mode",
         choices=("train", "test", "benchmark"),
         default="train",
@@ -57,8 +63,12 @@ def config_path_for(env_id: str) -> Path:
 def load_configs(
     env_id: str = DEFAULT_ENV_ID,
     overrides: dict[str, Any] | None = None,
+    config_path: str = "",
 ) -> argparse.Namespace:
-    config_dict = load_yaml(file_dir=str(config_path_for(env_id)))
+    path = Path(config_path) if config_path else config_path_for(env_id)
+    if config_path and not path.exists():
+        raise FileNotFoundError(f"Unknown highway MAPPO config: {path}")
+    config_dict = load_yaml(file_dir=str(path))
     if overrides:
         config_dict = recursive_dict_update(config_dict, overrides)
     return argparse.Namespace(**config_dict)
@@ -222,7 +232,7 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    configs = load_configs(args.env_id, cli_overrides(args))
+    configs = load_configs(args.env_id, cli_overrides(args), config_path=args.config)
     run(configs, mode=args.mode, save_model=not args.no_save)
     return 0
 

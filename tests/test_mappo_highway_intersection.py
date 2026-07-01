@@ -5,11 +5,13 @@ from xuance.common import load_yaml
 from xuance.common.memory_tools_marl import BaseBuffer
 
 
-CONFIG_PATH = Path("examples/mappo/mappo_highway_configs/intersection_v1.yaml")
+CONFIG_DIR = Path("examples/mappo/mappo_highway_configs")
+FORMAL_CONFIG_PATH = CONFIG_DIR / "intersection_v1.yaml"
+SMOKE_CONFIG_PATH = CONFIG_DIR / "intersection_v1_smoke.yaml"
 
 
-def test_highway_mappo_config_uses_small_discrete_dummy_defaults():
-    config = load_yaml(file_dir=str(CONFIG_PATH))
+def test_highway_mappo_smoke_config_uses_small_discrete_dummy_defaults():
+    config = load_yaml(file_dir=str(SMOKE_CONFIG_PATH))
 
     assert config["dl_toolbox"] == "torch"
     assert config["device"] == "cpu"
@@ -31,8 +33,51 @@ def test_highway_mappo_config_uses_small_discrete_dummy_defaults():
     assert highway_config["action"]["action_config"]["target_speeds"] == [0, 4.5, 9]
 
 
+def test_highway_mappo_formal_config_uses_complete_training_defaults():
+    config = load_yaml(file_dir=str(FORMAL_CONFIG_PATH))
+
+    assert config["dl_toolbox"] == "torch"
+    assert config["device"] == "cpu"
+    assert config["agent"] == "MAPPO"
+    assert config["env_name"] == "HighwayIntersection"
+    assert config["env_id"] == "intersection-v1"
+    assert config["vectorize"] == "DummyVecMultiAgentEnv"
+    assert config["continuous_action"] is False
+    assert config["policy"] == "Categorical_MAAC_Policy"
+    assert config["representation"] == "Basic_MLP"
+    assert config["use_global_state"] is True
+    assert config["use_actions_mask"] is False
+    assert config["flatten_observations"] is True
+
+    assert config["wandb_user_name"] == "your_user_name"
+    assert config["test_mode"] is False
+    assert config["master_port"] == "12355"
+    assert config["rnn"] == "GRU"
+    assert config["fc_hidden_sizes"] == [64, 64, 64]
+    assert config["recurrent_hidden_size"] == 64
+    assert config["N_recurrent_layers"] == 1
+    assert config["dropout"] == 0
+    assert config["initialize"] == "orthogonal"
+    assert config["gain"] == 0.01
+    assert config["target_kl"] == 0.25
+    assert config["clip_type"] == 1
+
+    assert config["parallels"] >= 4
+    assert config["buffer_size"] >= 400
+    assert config["running_steps"] >= 1_000_000
+    assert config["eval_interval"] >= 10_000
+    assert config["test_episode"] >= 5
+
+    highway_config = config["highway_config"]
+    assert highway_config["controlled_vehicles"] == 3
+    assert highway_config["normalize_reward"] is False
+    assert highway_config["observation"]["type"] == "MultiAgentObservation"
+    assert highway_config["action"]["type"] == "MultiAgentAction"
+    assert highway_config["action"]["action_config"]["target_speeds"] == [0, 4.5, 9]
+
+
 def test_highway_mappo_config_includes_xuance_learner_required_fields():
-    config = load_yaml(file_dir=str(CONFIG_PATH))
+    config = load_yaml(file_dir=str(FORMAL_CONFIG_PATH))
 
     assert config["learning_rate"] == 0.0003
     assert config["weight_decay"] == 0
@@ -60,6 +105,62 @@ def test_load_configs_resolves_highway_yaml_and_applies_cli_overrides():
     assert configs.parallels == 1
     assert configs.buffer_size == 4
     assert configs.highway_config["controlled_vehicles"] == 3
+
+
+def test_load_configs_can_use_explicit_config_path(tmp_path):
+    from examples.mappo import mappo_highway_intersection
+
+    custom_config = tmp_path / "custom_intersection.yaml"
+    custom_config.write_text(
+        SMOKE_CONFIG_PATH.read_text(encoding="utf-8").replace(
+            "controlled_vehicles: 3", "controlled_vehicles: 2"
+        ),
+        encoding="utf-8",
+    )
+
+    configs = mappo_highway_intersection.load_configs(
+        config_path=str(custom_config),
+        overrides={"running_steps": 4},
+    )
+
+    assert configs.running_steps == 4
+    assert configs.highway_config["controlled_vehicles"] == 2
+
+
+def test_main_passes_empty_default_and_explicit_config_path(monkeypatch, tmp_path):
+    from examples.mappo import mappo_highway_intersection
+
+    calls = []
+    custom_config = tmp_path / "custom_intersection.yaml"
+    custom_config.write_text(
+        SMOKE_CONFIG_PATH.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    def fake_load_configs(env_id, overrides=None, config_path=""):
+        calls.append(("load", env_id, config_path, overrides["running_steps"]))
+        return "configs"
+
+    monkeypatch.setattr(mappo_highway_intersection, "load_configs", fake_load_configs)
+    monkeypatch.setattr(
+        mappo_highway_intersection,
+        "run",
+        lambda configs, mode, save_model: calls.append((configs, mode, save_model)),
+    )
+
+    result = mappo_highway_intersection.main(["--running-steps", "4", "--no-save"])
+    assert result == 0
+
+    result = mappo_highway_intersection.main(
+        ["--config", str(custom_config), "--running-steps", "8", "--no-save"]
+    )
+    assert result == 0
+
+    assert calls == [
+        ("load", "intersection_v1", "", 4),
+        ("configs", "train", False),
+        ("load", "intersection_v1", str(custom_config), 8),
+        ("configs", "train", False),
+    ]
 
 
 def test_train_mode_registers_env_and_runs_one_training_slice(monkeypatch):

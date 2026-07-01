@@ -5,11 +5,11 @@ Updated: 2026-07-01
 
 ## Summary
 
-当前仓库已经完成了 `highway-env` 交叉路口环境到 XuanCe 多智能体接口的适配层，并新增了小参数 highway intersection MAPPO 训练入口和 YAML 配置，但还没有形成一个可复现、可训练、可评估的正式 highway intersection MAPPO baseline。
+当前仓库已经完成了 `highway-env` 交叉路口环境到 XuanCe 多智能体接口的适配层，并新增了 highway intersection MAPPO 训练入口、正式 YAML 配置和小参数烟测配置，但还没有形成一个可复现、可评估并带结果归档的正式 highway intersection MAPPO baseline。
 
 也就是说，当前状态更接近：
 
-- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试、terminal agent 后续 transition 的 mask/reward 处理、random / idle-only sanity baseline 基础版，以及 highway MAPPO 小参数 runner/config。
+- 已有：环境适配器、XuanCe 注册、reset/step/state 基础兼容性测试、terminal agent 后续 transition 的 mask/reward 处理、random / idle-only sanity baseline 基础版，以及 highway MAPPO runner、正式配置和 smoke 配置。
 - 缺少：训练后评估指标脚本、正式多 seed 训练结果归档和实验说明。
 
 ## Current State
@@ -85,18 +85,19 @@ Updated: 2026-07-01
    - 输出 mean episode reward、mean per-agent reward、episode length、collision rate、arrival rate、truncation rate。
    - 可选输出完整 JSON 结果。
 
-6. Highway MAPPO 小参数训练入口
+6. Highway MAPPO 训练入口和配置
 
    文件：
 
    - `examples/mappo/mappo_highway_intersection.py`
    - `examples/mappo/mappo_highway_configs/intersection_v1.yaml`
+   - `examples/mappo/mappo_highway_configs/intersection_v1_smoke.yaml`
 
    已支持：
 
    - 注册 `HighwayIntersection` 并通过 `make_envs(configs)` 创建 `DummyVecMultiAgentEnv`。
    - 使用 `Categorical_MAAC_Policy` 和 `Basic_MLP` 初始化 `MAPPO_Agents`。
-   - 默认 CPU、小并行数、小 buffer、短 `running_steps`，用于快速训练链路烟测。
+   - `intersection_v1.yaml` 提供正式训练配置；`intersection_v1_smoke.yaml` 保留 CPU、小并行数、小 buffer、短 `running_steps`，用于快速训练链路烟测。
    - 通过 `flatten_observations: true` 将二维 kinematics observation 展平成一维向量，匹配 XuanCe `Basic_MLP`。
    - 对 XuanCe 1.4.3 MARL buffer 的 `n_envs` / `obs_space` / `act_space` 旧属性读取做 runner 内兼容补丁，不修改 `.venv`。
 
@@ -120,13 +121,26 @@ Updated: 2026-07-01
 
 当前 `main.py` 仍只适合适配器冒烟；MAPPO 训练使用 `examples/mappo/mappo_highway_intersection.py`。
 
-### 2. Highway 专用 MAPPO YAML 配置（小参数版已完成）
+### 2. Highway 专用 MAPPO YAML 配置（正式配置和 smoke 配置已完成基础版）
 
 已新增配置文件：
 
 `examples/mappo/mappo_highway_configs/intersection_v1.yaml`
 
-当前配置使用小参数，便于快速迭代：
+这是参考 `examples/mappo/mappo_mpe_configs/simple_spread_v3.yaml` 补齐字段后的正式训练配置。它保留 highway wrapper 需要的离散动作 policy、`flatten_observations: true` 和 `use_global_state: true`，并使用更长训练步数和更大的 buffer。
+
+关键设置：
+
+- `policy: "Categorical_MAAC_Policy"`，匹配 `intersection-v1` 的 `Discrete(3)` 动作空间。
+- `vectorize: "DummyVecMultiAgentEnv"`，优先保持 Windows 本地实验稳定；需要更高吞吐时再测试 `SubprocVecMultiAgentEnv`。
+- `parallels: 4`、`buffer_size: 1024`、`n_epochs: 4`、`n_minibatch: 4`、`running_steps: 1000000`、`eval_interval: 10000`、`test_episode: 5`。
+- `highway_config` 显式记录 `MultiAgentObservation` / `MultiAgentAction`、3 个受控车辆、40 秒 episode、奖励和离散目标速度。
+
+烟测配置文件：
+
+`examples/mappo/mappo_highway_configs/intersection_v1_smoke.yaml`
+
+该配置使用小参数，便于快速迭代：
 
 ```yaml
 dl_toolbox: "torch"
@@ -224,7 +238,7 @@ highway_config:
 已验证命令：
 
 ```bash
-uv run python examples/mappo/mappo_highway_intersection.py --env-id intersection_v1 --mode train --running-steps 8 --buffer-size 4 --parallels 1 --n-epochs 1 --n-minibatch 1 --no-save
+uv run python examples/mappo/mappo_highway_intersection.py --env-id intersection_v1_smoke --mode train --running-steps 8 --buffer-size 4 --parallels 1 --n-epochs 1 --n-minibatch 1 --no-save
 ```
 
 该命令完成后会打印 `Finish training.`。这仍然只是接口和训练链路烟测，不用于评价算法性能。
