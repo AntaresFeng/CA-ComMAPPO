@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ca-commappo"
 version = "0.1.0"
@@ -17,6 +21,16 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["ca_commappo*"]
+exclude = [
+    "docs*",
+    "examples*",
+    "logs*",
+    "models*",
+    "tests*",
+]
 
 [tool.uv.sources]
 torch = [
