@@ -4,11 +4,43 @@
 
 ## 本地运行
 
-（项目重构中，等稳定后写）
+运行 sanity baseline：
+
+```powershell
+uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy all
+```
+
+调试单个 highway intersection episode：
+
+```powershell
+uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper --seed 7 --max-steps 1
+```
+
+运行 highway intersection MAPPO 小参数烟测：
+
+```powershell
+uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection_v1_smoke.yaml --mode train --no-save
+```
+
+也可以通过顶层 dispatcher 调用：
+
+```powershell
+uv run python main.py sanity --config configs/sanity/highway_intersection.yaml --policy all
+uv run python main.py debug-wrapper --target wrapper --seed 7 --max-steps 1
+uv run python main.py mappo --config configs/mappo/intersection_v1_smoke.yaml --mode train --no-save
+```
 
 ## 项目结构
 
-（项目重构中，等稳定后写）
+- `ca_commappo/envs/`: highway-env 到 XuanCe 多智能体接口的环境适配器，以及 wrapper 端到端调试工具。
+- `ca_commappo/evaluation/`: sanity baseline 执行和 summary 逻辑。
+- `ca_commappo/cli/`: 本项目维护的普通命令行入口，例如 sanity baseline 运行入口。
+- `ca_commappo/training/`: 本项目维护的训练入口。
+- `configs/sanity/`: sanity baseline 配置。
+- `configs/mappo/`: highway intersection MAPPO 配置。
+- `examples/mappo/`: vendored XuanCe MAPPO 上游参考示例，仅作参考，不放本项目维护代码。
+- `docs/`: 设计说明、排查记录和实验协议。
+- `tests/`: pytest 测试。
 
 ## Highway `intersection-v1` 的 xuance 适配器
 

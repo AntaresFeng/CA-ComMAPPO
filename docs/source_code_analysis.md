@@ -4,6 +4,8 @@
 >
 > 分析日期：2026-07-02 | 方法：四个子代理并行阅读源码后人工综合
 
+> 结构迁移更新：2026-07-02 已将本项目维护的 CLI、训练入口和 highway 配置从 `examples/` 迁出。当前项目代码位于 `ca_commappo/cli/`、`ca_commappo/training/` 和 `configs/`；`examples/mappo/` 只保留 vendored XuanCe 上游参考。已删除的 `evaluate_*` 系列不纳入本轮重构，等待后续重新设计。
+
 ---
 
 ## 目录
@@ -26,12 +28,12 @@
 | `ca_commappo/envs/highway_intersection.py` | 254 | **核心：highway-env → XuanCe 适配器** |
 | `ca_commappo/evaluation/__init__.py` | 1 | 包标记 |
 | `ca_commappo/evaluation/highway_metrics.py` | 122 | **指标基础设施（纯函数）** |
-| `ca_commappo/evaluation/sanity_baselines.py` | 199 | **sanity baseline 执行器** |
-| `main.py` | 108 | 顶层 CLI entrypoint |
-| `examples/random_highway_intersection.py` | 68 | 兜底策略评估执行器 |
-| `examples/debug_highway_env_episode.py` | 598 | 单 episode 逐帧调试工具 |
-| `examples/evaluate_highway_intersection.py` | 89 | **名不副实：纯 JSON 后处理汇总器** |
-| `examples/mappo/mappo_highway_intersection.py` | 242 | **唯一可运行的 MAPPO 训练入口** |
+| `ca_commappo/evaluation/sanity_baseline_runner.py` | 199 | **sanity baseline 执行器** |
+| `main.py` | 34 | 顶层薄 dispatcher |
+| `ca_commappo/cli/run_sanity_baseline.py` | 68 | 兜底策略评估执行器 |
+| `ca_commappo/envs/debug_highway_wrapper.py` | 598 | 单 episode 逐帧调试工具 |
+| `examples/evaluate_highway_intersection.py` | 已删除 | 旧 JSON 后处理器，等待后续评估链路重构 |
+| `ca_commappo/training/mappo_highway_intersection.py` | 242 | **唯一可运行的 MAPPO 训练入口** |
 | `examples/mappo/mappo_simple_spread.py` | 97 | 含 bug，不可运行 |
 | `examples/mappo/mappo_football.py` | 228 | 含 bug，不可运行 |
 | `examples/mappo/mappo_sc2.py` | 251 | 含 bug，不可运行 |
@@ -63,7 +65,7 @@
 - **`summarize_episode_records(records)`**（L48-77）：聚合均值。**`mean_agent_reward` / `mean_per_agent_reward` / `mean_episode_reward` 三个 key 数值相同**（均为全局 reward 池均值，L57-60）。
 - **`_add_optional_mean`**（L119-121）：条件性添加 `mean_agent_collision_fraction` / `mean_agent_arrival_fraction`。
 
-### 2.3 `ca_commappo/evaluation/sanity_baselines.py` — Sanity baseline 执行器
+### 2.3 `ca_commappo/evaluation/sanity_baseline_runner.py` — Sanity baseline 执行器
 
 - **`SUPPORTED_POLICIES = ("random", "idle-only")`**（L19）。`idle-only` 硬编码动作 `1`（L61，**与 `IDLE_ACTION` 重复定义，未引用**）。
 - **`run_episode()`**（L73-119）：每步调 `controlled_vehicle_flags` + `episode_outcome`，命中 collision/arrival/truncated 即 break。**break 用原始 `truncated`（L98），与 `episode_outcome` 去过 collision/arrival 的 `truncated` 语义不同**。
@@ -73,32 +75,30 @@
 
 ### 2.4 `main.py` — 顶层 CLI
 
-- `debug` → 转发 `examples.debug_highway_env_episode`
-- `sanity` → 转发 `examples.random_highway_intersection`
-- `smoke` → 内联单步 wrapper 自检（reset + step 打印）
-- **无 mappo 子命令**
+- 当前是薄 dispatcher，不再内联环境或训练逻辑。
+- `debug-wrapper` → 转发 `ca_commappo.envs.debug_highway_wrapper`
+- `sanity` → 转发 `ca_commappo.cli.run_sanity_baseline`
+- `mappo` → 转发 `ca_commappo.training.mappo_highway_intersection`
 
-### 2.5 `examples/random_highway_intersection.py` — 兜底评估 CLI
+### 2.5 `ca_commappo/cli/run_sanity_baseline.py` — 兜底评估 CLI
 
-- 委托 `sanity_baselines.run_sanity_baseline()` 跑环境 + 聚合。
-- `--policy` choices 写死 `["random", "idle-only", "all"]`（L25-28），与 `SUPPORTED_POLICIES` 双源。
+- 委托 `sanity_baseline_runner.run_sanity_baseline()` 跑环境 + 聚合。
+- `--policy` choices 复用 `SUPPORTED_POLICIES` 并追加 `all`。
 - `print_summary()` 本地拼接（L39-49），**不复用 `format_summary_lines`，缺 `mean_per_agent_reward` 字段**。
 
-### 2.6 `examples/debug_highway_env_episode.py` — 调试工具
+### 2.6 `ca_commappo/envs/debug_highway_wrapper.py` — 调试工具
 
 - 单 episode 逐帧打印，支持 `--target raw / wrapper / both`。
-- `raw` 用 `gym.make`；`wrapper` 用 `HighwayIntersectionMultiAgentEnv`（但 argparse 称 "XuanCe wrapper"，**实际无 XuanCe 引用**，L32-34）。
+- `raw` 用 `gym.make`；`wrapper` 用 `HighwayIntersectionMultiAgentEnv`，当前 argparse 描述已改为 CA-ComMAPPO adapter。
 - 所有统计本地实现。`controlled_vehicle_flags`（L579-584）与 `highway_metrics` 逻辑重复。
 - 默认 `controlled_vehicles=2`、`duration=15`（L21-27），与 sanity yaml（3、13）不一致。
 
-### 2.7 `examples/evaluate_highway_intersection.py` — 名不副实的"评估器"
+### 2.7 `examples/evaluate_highway_intersection.py` — 已删除，待后续重构
 
-- **不开 env、不加载模型、不跑 rollout**（import 无 torch、无 gym、无 HighwayIntersectionMultiAgentEnv）。
-- 输入：已有 JSON → 输出：`format_summary_lines` 打印 + 可选 JSON 写盘。
-- **应叫 `summarize_highway_evaluation`**。
-- `save_results_json`（L49-55）与 `sanity_baselines.py:156-162` 逐字重复。
+- 旧版本是纯 JSON 后处理器，不开 env、不加载模型、不跑 rollout。
+- 本轮结构迁移不恢复它；评估链路和 MAPPO rollout JSON 输出等待后续重构。
 
-### 2.8 `examples/mappo/mappo_highway_intersection.py` — 唯一的 MAPPO 训练入口
+### 2.8 `ca_commappo/training/mappo_highway_intersection.py` — 唯一的 MAPPO 训练入口
 
 - **`run()`**（L211-239）：register env → `patch_xuance_marl_buffer_aliases()`（猴补丁 XuanCe 1.4.3，L111-136）→ `make_envs` → `MAPPO_Agents` → 模式分支。
 - **`train()`**（L139-144）：只调 `agents.train()` + 可选 `save_model("final_train_model.pth")`，**不评估**。
@@ -121,20 +121,20 @@
 
 | 代码片段 | 位置 1 | 位置 2 | 差异 |
 |---|---|---|---|
-| `save_results_json`（`mkdir` + `json.dumps(indent=2, sort_keys=True)`） | `sanity_baselines.py:156-162` | `evaluate_highway_intersection.py:49-55` | 无 |
-| `controlled_vehicle_flags`（`_unwrap_base_env` → 读 `crashed` / `has_arrived`） | `highway_metrics.py:12-19` | `debug_highway_env_episode.py:579-584` | 无 |
+| `save_results_json`（`mkdir` + `json.dumps(indent=2, sort_keys=True)`） | `sanity_baseline_runner.py:156-162` | `evaluate_highway_intersection.py:49-55` | 无 |
+| `controlled_vehicle_flags`（`_unwrap_base_env` → 读 `crashed` / `has_arrived`） | `highway_metrics.py:12-19` | `debug_highway_wrapper.py:579-584` | 无 |
 
 ### 3.2 语义重复 / 未共享常量的代码
 
 | 语义 | 定义处 | 硬编码处 | 风险 |
 |---|---|---|---|
-| IDLE 动作 = 1 | `highway_intersection.py:13`（`IDLE_ACTION=1`） | `sanity_baselines.py:61`（`{agent: 1}`） | 动作表变动时两处须同步改，无断言 |
-| `"intersection-v1"` 默认可信值 | `highway_intersection.py:68` | `sanity_baselines.py:50`（YAML env_id） | 无共享默认常量的真源 |
+| IDLE 动作 = 1 | `highway_intersection.py:13`（`IDLE_ACTION=1`） | `sanity_baseline_runner.py:61`（`{agent: 1}`） | 动作表变动时两处须同步改，无断言 |
+| `"intersection-v1"` 默认可信值 | `highway_intersection.py:68` | `sanity_baseline_runner.py:50`（YAML env_id） | 无共享默认常量的真源 |
 
 ### 3.3 三处分散的打印格式
 
 - `evaluate_highway_intersection.py:37-46`：走 `format_summary_lines`（`highway_metrics.py:97-106`），全量字段
-- `random_highway_intersection.py:39-49`：本地拼接，**缺 `mean_per_agent_reward`**
+- `run_sanity_baseline.py:39-49`：本地拼接，**缺 `mean_per_agent_reward`**
 - 三者打印格式各自一套，职责不清——聚合口径在 `highway_metrics`，但打印格式各写各的
 
 ### 3.4 四份 mappo example 的大量样板重复
@@ -152,9 +152,9 @@
 
 | 文件名 | 实际行为 | 应为 |
 |---|---|---|
-| `evaluate_highway_intersection.py` | 纯 JSON 后处理汇总器，不开 env | `summarize_highway_evaluation.py` |
-| `random_highway_intersection.py` | 跑 random + idle-only 进行兜底评估 | 可接受，但名字只点了 random |
-| `debug_highway_env_episode.py` argparse desc "XuanCe wrapper" | 直接 new `HighwayIntersectionMultiAgentEnv`，无 XuanCe | 应去掉 "XuanCe" 措辞 |
+| `examples/evaluate_highway_intersection.py` | 已删除 | 待后续重新设计评估链路 |
+| `ca_commappo/cli/run_sanity_baseline.py` | 跑 random + idle-only 进行兜底评估 | 已从 `examples/` 迁出 |
+| `ca_commappo/envs/debug_highway_wrapper.py` | 直接 new `HighwayIntersectionMultiAgentEnv`，无 XuanCe | 描述已改为 CA-ComMAPPO adapter |
 
 ### 4.2 环境层 vs 评估层终止语义双轨
 
@@ -188,8 +188,8 @@
 
 | 配置来源 | `controlled_vehicles` | `duration` | `arrived_reward` | `collision_reward` |
 |---|---|---|---|---|
-| `random_highway_intersection.py` → yaml | 3 | 13 | 默认 | 默认 |
-| `debug_highway_env_episode.py` → `DEFAULT_HIGHWAY_CONFIG` | 2 | 15 | 5 | -10 |
+| `run_sanity_baseline.py` → yaml | 3 | 13 | 默认 | 默认 |
+| `debug_highway_wrapper.py` → `DEFAULT_HIGHWAY_CONFIG` | 2 | 15 | 5 | -10 |
 | `mappo_highway_intersection.py` → yaml | 2 | 不同 | 默认 | 默认 |
 
 无共享默认常量的真源，同一语义不同默认值。
@@ -227,7 +227,7 @@ mappo_highway_intersection.py  evaluate_highway_intersection.py
   │  REWARD ONLY, 无碰撞率等     │ 调用 highway_metrics.summarize_evaluation_results
   │                              │
   │ benchmark(): agents.test()   │ 当前唯一 JSON 来源:
-  │  也只输出 reward mean/std    │ random_highway_intersection.py
+  │  也只输出 reward mean/std    │ run_sanity_baseline.py
   │                              │  仅 random/idle-only 策略
   │ 不import highway_metrics     │
   │ 不产出结构化 episode JSON     │
@@ -235,7 +235,7 @@ mappo_highway_intersection.py  evaluate_highway_intersection.py
   └─── 无连接 ──────────────────┘
 
 对照侧:
-sanity_baselines.py
+sanity_baseline_runner.py
   SUPPORTED_POLICIES = ("random", "idle-only")
   度量的是环境本身的碰撞/到达/超时几何属性, 不是策略好坏
 ```
@@ -290,18 +290,18 @@ sanity_baselines.py
 
 ### 短期（文件级修复）
 
-1. **`sanity_baselines.py`**
+1. **`sanity_baseline_runner.py`**
    - `idle-only` 动作 1 改为 import `IDLE_ACTION` 引用
    - 删除冗余 `_controlled_vehicle_flags` 包装
    - break 条件中的 `truncated` 与 `episode_outcome` 对齐语义
 
-2. **`evaluate_highway_intersection.py`**
-   - 重命名为 `summarize_highway_evaluation.py`（或文件名加"summarize"）
-   - `save_results_json` 复用 `sanity_baselines` 版本
+2. **评估后处理链路**
+   - 旧 `evaluate_highway_intersection.py` 已删除。
+   - 后续应重新设计 MAPPO rollout JSON 输出和汇总入口。
 
-3. **`debug_highway_env_episode.py`**
+3. **`ca_commappo/envs/debug_highway_wrapper.py`**
    - `controlled_vehicle_flags` 复用 `highway_metrics` 版本
-   - 更正 argparse description 中 "XuanCe wrapper" 措辞
+   - argparse description 中 "XuanCe wrapper" 措辞已在结构迁移中修正
 
 4. **`highway_metrics.py`**
    - `mean_agent_reward` / `mean_per_agent_reward` / `mean_episode_reward` 三键去重
@@ -347,9 +347,9 @@ sanity_baselines.py
 | `highway_intersection.py` | L252-253 | `register_highway_intersection_env` 需显式调用 |
 | `highway_metrics.py` | L14-19 | 穿透 `_unwrap_base_env` 读 `crashed`/`has_arrived` |
 | `highway_metrics.py` | L57-60 | 三个 mean reward key 数值相同 |
-| `sanity_baselines.py` | L61 | `{agent: 1}` 独立硬编码 IDLE 动作 |
-| `sanity_baselines.py` | L171-174 | 冗余包装 `_controlled_vehicle_flags` |
-| `sanity_baselines.py` | L98 | break 用原始 `truncated`，与 outcome 语义不同 |
+| `sanity_baseline_runner.py` | L61 | `{agent: 1}` 独立硬编码 IDLE 动作 |
+| `sanity_baseline_runner.py` | L171-174 | 冗余包装 `_controlled_vehicle_flags` |
+| `sanity_baseline_runner.py` | L98 | break 用原始 `truncated`，与 outcome 语义不同 |
 | `mappo_highway_intersection.py` | L111-136 | monkey-patch 藏在 example 里 |
 | `mappo_highway_intersection.py` | L139-144 | train() 不评估，只 `.pth` |
 | `mappo_highway_intersection.py` | L147-156 | test() 只打 Mean Score/Std |

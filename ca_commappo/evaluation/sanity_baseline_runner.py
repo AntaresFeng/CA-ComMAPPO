@@ -8,7 +8,10 @@ import numpy as np
 import yaml
 from gymnasium import spaces
 
-from ca_commappo.envs.highway_intersection import HighwayIntersectionMultiAgentEnv
+from ca_commappo.envs.highway_intersection import (
+    IDLE_ACTION,
+    HighwayIntersectionMultiAgentEnv,
+)
 
 
 SUPPORTED_POLICIES = ("random", "idle-only")
@@ -53,7 +56,7 @@ def load_sanity_config(path: str | Path) -> SanityConfig:
 
 def select_actions(env: Any, policy: str, rng: np.random.Generator) -> dict[str, int]:
     if policy == "idle-only":
-        return {agent: 1 for agent in env.agents}
+        return {agent: IDLE_ACTION for agent in env.agents}
     if policy == "random":
         actions = {}
         for agent in env.agents:

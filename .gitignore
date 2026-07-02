@@ -10,8 +10,7 @@ wheels/
 .venv/
 
 # Tool caches
-.pytest_cache/
-.ruff_cache/
+.*_cache/
 
 # Experiment artifacts
 logs/
@@ -20,3 +19,7 @@ results/
 
 # Editor settings
 .vscode/
+
+# Agents directories
+.agents/
+.codex*/

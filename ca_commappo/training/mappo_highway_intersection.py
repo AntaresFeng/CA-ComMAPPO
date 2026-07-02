@@ -12,7 +12,7 @@ from xuance.torch.utils.operations import set_seed
 from ca_commappo.envs.highway_intersection import register_highway_intersection_env
 
 
-CONFIG_DIR = Path(__file__).resolve().parent / "mappo_highway_configs"
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "mappo"
 DEFAULT_ENV_ID = "intersection_v1"
 
 

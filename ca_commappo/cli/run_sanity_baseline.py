@@ -2,16 +2,17 @@ import argparse
 import sys
 from pathlib import Path
 
-from ca_commappo.evaluation.sanity_baselines import (
+from ca_commappo.evaluation.sanity_baseline_runner import (
     load_sanity_config,
     run_sanity_baseline,
     save_results_json,
+    SUPPORTED_POLICIES,
 )
 
-DEFAULT_CONFIG = Path("examples/sanity/highway_intersection.yaml")
+DEFAULT_CONFIG = Path("configs/sanity/highway_intersection.yaml")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run random and idle-only sanity baselines for highway intersection."
     )
@@ -23,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--policy",
-        choices=["random", "idle-only", "all"],
+        choices=SUPPORTED_POLICIES + ("all",),
         default="all",
         help="Policy to evaluate. Use 'all' for all policies in the config.",
     )
@@ -33,7 +34,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional JSON file path for full episode records and summaries.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def print_summary(results: dict) -> None:
@@ -49,8 +50,8 @@ def print_summary(results: dict) -> None:
         print(f"  truncation_rate={summary['truncation_rate']:.3f}")
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     try:
         config = load_sanity_config(args.config)
         results = run_sanity_baseline(config, policy=args.policy)

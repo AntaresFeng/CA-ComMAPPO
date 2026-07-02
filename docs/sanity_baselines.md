@@ -16,32 +16,32 @@ Date: 2026-06-29
 运行配置中所有策略：
 
 ```powershell
-uv run python examples/random_highway_intersection.py --config examples/sanity/highway_intersection.yaml --policy all
+uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy all
 ```
 
 只运行随机策略：
 
 ```powershell
-uv run python examples/random_highway_intersection.py --config examples/sanity/highway_intersection.yaml --policy random
+uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy random
 ```
 
 只运行 idle-only：
 
 ```powershell
-uv run python examples/random_highway_intersection.py --config examples/sanity/highway_intersection.yaml --policy idle-only
+uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy idle-only
 ```
 
 保存完整 episode 记录和 summary：
 
 ```powershell
-uv run python examples/random_highway_intersection.py --config examples/sanity/highway_intersection.yaml --policy all --output results/sanity_highway.json
+uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy all --output results/sanity_highway.json
 ```
 
 ## YAML Protocol
 
 默认配置：
 
-`examples/sanity/highway_intersection.yaml`
+`configs/sanity/highway_intersection.yaml`
 
 字段含义：
 

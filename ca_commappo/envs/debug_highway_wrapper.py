@@ -27,19 +27,19 @@ DEFAULT_HIGHWAY_CONFIG = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run one complete highway-env intersection episode through the raw "
-            "Gymnasium env, the XuanCe wrapper, or both."
+            "Gymnasium env, the CA-ComMAPPO adapter, or both."
         ),
         epilog=(
             "Examples:\n"
-            "  uv run python examples/debug_highway_env_episode.py\n"
-            "  uv run python examples/debug_highway_env_episode.py --actions '1,1,1'\n"
-            "  uv run python examples/debug_highway_env_episode.py --target wrapper "
+            "  uv run python -m ca_commappo.envs.debug_highway_wrapper\n"
+            "  uv run python -m ca_commappo.envs.debug_highway_wrapper --actions '1,1,1'\n"
+            "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
             "--render-mode human --render-each-step --pause 0.001\n"
-            "  uv run python examples/debug_highway_env_episode.py --target wrapper "
+            "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
             "--action random --seed 7 --print-observations"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -152,7 +152,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print the complete merged highway config used to create the envs.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.actions is not None and args.action == "random":
         args.action = "manual"
@@ -166,8 +166,8 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     try:
         highway_config = build_highway_config(args)
         complete_config = build_intersection_config(highway_config)

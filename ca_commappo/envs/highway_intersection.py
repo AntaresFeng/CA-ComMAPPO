@@ -10,7 +10,9 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
 
 DEFAULT_ENV_NAME = "HighwayIntersection"
-IDLE_ACTION = 1
+IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES[
+    "IDLE"
+]  # {0: "SLOWER", 1: "IDLE", 2: "FASTER"}
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
