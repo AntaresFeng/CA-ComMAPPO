@@ -1,11 +1,9 @@
 import argparse
 import json
-import re
 import sys
 import time
-from argparse import Namespace
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import gymnasium as gym
 import highway_env  # noqa: F401 - importing registers highway-env ids.
@@ -17,11 +15,24 @@ from ca_commappo.envs.highway_intersection import (
     build_intersection_config,
 )
 
+
+class StepData(NamedTuple):
+    obs: Any
+    rewards: tuple[Any, ...]
+    terminated: tuple[Any, ...]
+    global_terminated: bool
+    truncated: bool
+    info: dict[str, Any]
+    agent_mask: tuple[Any, ...] | None = None
+    state: np.ndarray | None = None
+
+
 DEFAULT_ENV_ID = "intersection-v1"
 DEFAULT_HIGHWAY_CONFIG = {
     "controlled_vehicles": 2,
     "duration": 15,
-    "spawn_probability": 0.6,
+    "spawn_probability": 1.0,
+    "initial_vehicle_count": 20,
     "arrived_reward": 5,
     "collision_reward": -10,
 }
@@ -38,9 +49,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --actions '1,1,1'\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
-            "--render-mode human --render-each-step --pause 0.001\n"
+            "--render-mode human --pause 0.001\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
-            "--action random --seed 7 --print-observations"
+            "--seed 7 --print-observations"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -69,12 +80,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=None,
         help="Optional separate seed for random action generation.",
-    )
-    parser.add_argument(
-        "--action",
-        choices=["random", "manual"],
-        default="random",
-        help="Use random actions or a manually specified fixed action vector.",
     )
     parser.add_argument(
         "--actions",
@@ -132,11 +137,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Pass a render_mode to highway-env.",
     )
     parser.add_argument(
-        "--render-each-step",
-        action="store_true",
-        help="Call render() after reset and every step.",
-    )
-    parser.add_argument(
         "--pause",
         type=float,
         default=0.0,
@@ -154,10 +154,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     args = parser.parse_args(argv)
 
-    if args.actions is not None and args.action == "random":
-        args.action = "manual"
-    if args.action == "manual" and args.actions is None:
-        parser.error("--actions is required when --action manual")
     if args.max_steps is not None and args.max_steps <= 0:
         parser.error("--max-steps must be a positive integer")
     if args.pause < 0:
@@ -187,27 +183,32 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_highway_config(args: argparse.Namespace) -> dict[str, Any]:
     highway_config = dict(DEFAULT_HIGHWAY_CONFIG)
-    if args.config_file is not None:
-        loaded_config = json.loads(args.config_file.read_text(encoding="utf-8"))
-        if not isinstance(loaded_config, dict):
-            raise ValueError("--config-file must contain a JSON object")
-        highway_config = deep_merge(highway_config, loaded_config)
-    if args.highway_config_json is not None:
-        loaded_config = json.loads(args.highway_config_json)
-        if not isinstance(loaded_config, dict):
-            raise ValueError("--highway-config-json must be a JSON object")
-        highway_config = deep_merge(highway_config, loaded_config)
-
-    common_overrides = {
+    highway_config = _merge_json_source(
+        highway_config, args.config_file, "--config-file"
+    )
+    highway_config = _merge_json_source(
+        highway_config, args.highway_config_json, "--highway-config-json"
+    )
+    for key, value in {
         "controlled_vehicles": args.controlled_vehicles,
         "duration": args.duration,
         "spawn_probability": args.spawn_probability,
         "initial_vehicle_count": args.initial_vehicle_count,
-    }
-    for key, value in common_overrides.items():
+    }.items():
         if value is not None:
             highway_config[key] = value
     return highway_config
+
+
+def _merge_json_source(base: dict[str, Any], source: Any, label: str) -> dict[str, Any]:
+    if source is None:
+        return base
+    loaded = json.loads(
+        source.read_text(encoding="utf-8") if isinstance(source, Path) else source
+    )
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{label} must contain a JSON object")
+    return deep_merge(base, loaded)
 
 
 def deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -236,11 +237,13 @@ def build_action_plan(
         if not isinstance(probe_env.action_space, spaces.Tuple):
             raise TypeError("Expected raw action_space to be gymnasium.spaces.Tuple")
         action_space = probe_env.action_space
-        if args.action == "manual":
+        if args.actions is not None:
             action = parse_manual_actions(args.actions, action_space)
             return [action for _ in range(max_steps)]
 
-        rng = np.random.default_rng(effective_action_seed(args))
+        rng = np.random.default_rng(
+            args.action_seed if args.action_seed is not None else args.seed
+        )
         return [sample_tuple_action(action_space, rng) for _ in range(max_steps)]
     finally:
         probe_env.close()
@@ -250,11 +253,7 @@ def parse_manual_actions(
     raw_actions: str,
     action_space: spaces.Tuple,
 ) -> tuple[int, ...]:
-    values = [
-        int(token)
-        for token in re.split(r"[,\s]+", raw_actions.strip())
-        if token.strip()
-    ]
+    values = [int(token) for token in raw_actions.replace(",", " ").split() if token]
     if not values:
         raise ValueError("--actions must include at least one integer action id")
 
@@ -286,10 +285,6 @@ def sample_tuple_action(
     return tuple(sampled_actions)
 
 
-def effective_action_seed(args: argparse.Namespace) -> int | None:
-    return args.action_seed if args.action_seed is not None else args.seed
-
-
 def print_run_header(
     args: argparse.Namespace,
     highway_config: dict[str, Any],
@@ -301,7 +296,9 @@ def print_run_header(
     print(f"target={args.target}")
     print(f"env_id={args.env_id}")
     print(f"episode_seed={args.seed}")
-    print(f"action={args.action} action_seed={effective_action_seed(args)}")
+    action_mode = "manual" if args.actions is not None else "random"
+    action_seed = args.action_seed if args.action_seed is not None else args.seed
+    print(f"action={action_mode} action_seed={action_seed}")
     print(f"max_steps={max_steps}")
     print(f"highway_config={json.dumps(highway_config, sort_keys=True)}")
     print(f"first_actions={action_plan[: min(5, len(action_plan))]}")
@@ -317,46 +314,22 @@ def run_raw_episode(
 ) -> None:
     env = gym.make(args.env_id, config=complete_config, render_mode=args.render_mode)
     try:
-        print_env_surface_header("raw", env)
-        obs, info = env.reset(seed=args.seed)
-        print_reset("raw", obs, info, args.print_observations)
-        maybe_render(env, args)
 
-        total_rewards = np.zeros(len(action_plan[0]), dtype=np.float64)
-        last_truncated = False
-        last_terminated = False
-        steps = 0
-        for step_index, action in enumerate(action_plan, start=1):
+        def step(env, action):
             obs, reward, terminated, truncated, info = env.step(action)
-            steps = step_index
-            agent_rewards = tuple(info.get("agents_rewards", (reward,)))
-            total_rewards += np.asarray(agent_rewards, dtype=np.float64)
-            last_terminated = bool(terminated)
-            last_truncated = bool(truncated)
-            print_step(
-                target="raw",
-                step_index=step_index,
-                action=action,
-                rewards=agent_rewards,
+            return StepData(
+                obs=obs,
+                rewards=tuple(info.get("agents_rewards", (reward,))),
                 terminated=tuple(info.get("agents_terminated", (terminated,))),
                 global_terminated=bool(terminated),
                 truncated=bool(truncated),
                 info=info,
-                obs=obs,
-                print_observations=args.print_observations,
             )
-            maybe_render(env, args)
-            maybe_pause(args)
-            if terminated or truncated:
-                break
-        print_episode_summary(
-            "raw",
-            steps,
-            total_rewards,
-            last_terminated,
-            last_truncated,
-            controlled_vehicle_flags(env),
-        )
+
+        def done(sd):
+            return sd.global_terminated or sd.truncated
+
+        run_episode("raw", env, args, action_plan, step, done, env)
     finally:
         env.close()
 
@@ -367,62 +340,89 @@ def run_wrapper_episode(
     action_plan: list[tuple[Any, ...]],
 ) -> None:
     env = HighwayIntersectionMultiAgentEnv(
-        Namespace(
+        argparse.Namespace(
             env_id=args.env_id,
             render_mode=args.render_mode,
             highway_config=highway_config,
         )
     )
     try:
-        print_env_surface_header("wrapper", env)
-        obs, info = env.reset(seed=args.seed)
-        print_reset("wrapper", obs, info, args.print_observations)
-        maybe_render(env, args)
 
-        total_rewards = np.zeros(len(env.agents), dtype=np.float64)
-        last_truncated = False
-        last_terminated = False
-        steps = 0
-        for step_index, action in enumerate(action_plan, start=1):
-            action_dict = {
-                agent: action[agent_index]
-                for agent_index, agent in enumerate(env.agents)
-            }
+        def step(env, action):
+            action_dict = {agent: action[i] for i, agent in enumerate(env.agents)}
             obs, rewards, terminated, truncated, info = env.step(action_dict)
-            steps = step_index
-            agent_rewards = tuple(float(rewards[agent]) for agent in env.agents)
-            total_rewards += np.asarray(agent_rewards, dtype=np.float64)
-            global_terminated = bool(info.get("global_terminated", False))
-            last_terminated = global_terminated
-            last_truncated = bool(truncated)
-            print_step(
-                target="wrapper",
-                step_index=step_index,
-                action=action_dict,
-                rewards=agent_rewards,
+            return StepData(
+                obs=obs,
+                rewards=tuple(float(rewards[agent]) for agent in env.agents),
                 terminated=tuple(bool(terminated[agent]) for agent in env.agents),
-                global_terminated=global_terminated,
+                global_terminated=bool(info.get("global_terminated", False)),
                 truncated=bool(truncated),
                 info=info,
-                obs=obs,
-                print_observations=args.print_observations,
                 agent_mask=tuple(bool(env.agent_mask()[agent]) for agent in env.agents),
                 state=env.state(),
             )
-            maybe_render(env, args)
-            maybe_pause(args)
-            if global_terminated or truncated:
-                break
-        print_episode_summary(
-            "wrapper",
-            steps,
-            total_rewards,
-            last_terminated,
-            last_truncated,
-            controlled_vehicle_flags(env.env),
-        )
+
+        def done(sd):
+            return sd.global_terminated or sd.truncated
+
+        run_episode("wrapper", env, args, action_plan, step, done, env.env)
     finally:
         env.close()
+
+
+def run_episode(
+    target: str,
+    env: Any,
+    args: argparse.Namespace,
+    action_plan: list[tuple[Any, ...]],
+    step_fn: Any,
+    done_fn: Any,
+    raw_env: Any,
+) -> None:
+    print_env_surface_header(target, env)
+    obs, info = env.reset(seed=args.seed)
+    print_reset(target, obs, info, args.print_observations)
+    if args.render_mode == "human":
+        env.render()
+
+    total_rewards = np.zeros(len(action_plan[0]), dtype=np.float64)
+    last_truncated = False
+    last_terminated = False
+    steps = 0
+    for step_index, action in enumerate(action_plan, start=1):
+        sd = step_fn(env, action)
+        steps = step_index
+        total_rewards += np.asarray(sd.rewards, dtype=np.float64)
+        last_terminated = sd.global_terminated
+        last_truncated = sd.truncated
+        print_step(
+            target=target,
+            step_index=step_index,
+            action=action,
+            rewards=sd.rewards,
+            terminated=sd.terminated,
+            global_terminated=sd.global_terminated,
+            truncated=sd.truncated,
+            info=sd.info,
+            obs=sd.obs,
+            print_observations=args.print_observations,
+            agent_mask=sd.agent_mask,
+            state=sd.state,
+        )
+        if args.render_mode == "human":
+            env.render()
+        if args.pause:
+            time.sleep(args.pause)
+        if done_fn(sd):
+            break
+    print_episode_summary(
+        target,
+        steps,
+        total_rewards,
+        last_terminated,
+        last_truncated,
+        controlled_vehicle_flags(raw_env),
+    )
 
 
 def print_env_surface_header(target: str, env: Any) -> None:
@@ -489,7 +489,7 @@ def print_step(
 ) -> None:
     print(f"[{target}] step={step_index:03d}")
     print(f"  action={action}")
-    print(f"  rewards={format_agent_values(rewards)} total={sum_float(rewards):.3f}")
+    print(f"  rewards={format_agent_values(rewards)} total={sum(rewards):.3f}")
     print(
         "  done="
         f"agents={tuple(bool(value) for value in terminated)} "
@@ -526,10 +526,6 @@ def format_agent_values(values: tuple[Any, ...]) -> str:
         + ", ".join(f"a{i}={float(value):.3f}" for i, value in enumerate(values))
         + "]"
     )
-
-
-def sum_float(values: tuple[Any, ...]) -> float:
-    return float(sum(float(value) for value in values))
 
 
 def format_info(info: dict[str, Any]) -> str:
@@ -582,16 +578,6 @@ def controlled_vehicle_flags(raw_env: Any) -> tuple[list[bool], list[bool]]:
     crashed = [bool(vehicle.crashed) for vehicle in controlled_vehicles]
     arrived = [bool(base_env.has_arrived(vehicle)) for vehicle in controlled_vehicles]
     return crashed, arrived
-
-
-def maybe_render(env: Any, args: argparse.Namespace) -> None:
-    if args.render_each_step:
-        env.render()
-
-
-def maybe_pause(args: argparse.Namespace) -> None:
-    if args.pause:
-        time.sleep(args.pause)
 
 
 if __name__ == "__main__":
