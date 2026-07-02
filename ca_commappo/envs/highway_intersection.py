@@ -10,9 +10,7 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
 
 DEFAULT_ENV_NAME = "HighwayIntersection"
-IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES[
-    "IDLE"
-]  # {0: "SLOWER", 1: "IDLE", 2: "FASTER"}
+IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -216,6 +214,15 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             terminated = {agent: True for agent in self.agents}
         info["raw_agents_rewards"] = tuple(raw_rewards[agent] for agent in self.agents)
         info["agents_rewards"] = tuple(rewards[agent] for agent in self.agents)
+
+        # Upstream info["crashed"] is self.vehicle.crashed, i.e. only
+        # controlled_vehicles[0].  In a multi-agent setting this silently
+        # ignores collisions on all other agents (see abstract.py:179).
+        # Replace it with a per-agent tuple so downstream consumers see the
+        # true crash state of every controlled vehicle.
+        info["crashed"] = tuple(
+            vehicle.crashed for vehicle in self.env.unwrapped.controlled_vehicles
+        )
         self._last_agent_mask = active_before_step
         self._active_agents = {
             agent: active_before_step[agent] and not bool(terminated[agent])
