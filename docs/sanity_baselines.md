@@ -45,7 +45,7 @@ uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/hig
 
 字段含义：
 
-- `env_id`: highway-env 环境 id，当前为 `intersection-v1`。
+- `env_id`: highway-env 环境 id，当前为 `intersection-multi-agent-v1`。
 - `env_seed`: 未显式提供 `seeds` 时使用的默认 seed。
 - `episodes`: 每个 base seed 运行的 episode 数。
 - `seeds`: base seed 列表。

@@ -33,7 +33,7 @@ The canonical commands become:
 ```powershell
 uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy all
 uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper --seed 7
-uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection_v1_smoke.yaml --mode train --no-save
+uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
 ```
 
 Legacy direct paths under `examples/` are intentionally removed for project-owned code so the boundary stays visible.

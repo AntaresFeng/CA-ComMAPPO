@@ -1,4 +1,4 @@
-env_id: "intersection-v1"
+env_id: "intersection-multi-agent-v1"
 env_seed: 1
 episodes: 1
 seeds: [1, 2, 3, 4, 5]

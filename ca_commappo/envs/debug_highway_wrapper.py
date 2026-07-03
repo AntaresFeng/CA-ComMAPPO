@@ -11,6 +11,7 @@ import numpy as np
 from gymnasium import spaces
 
 from ca_commappo.envs.highway_intersection import (
+    DEFAULT_HIGHWAY_ENV_ID,
     HighwayIntersectionMultiAgentEnv,
     build_intersection_config,
 )
@@ -27,7 +28,7 @@ class StepData(NamedTuple):
     state: np.ndarray | None = None
 
 
-DEFAULT_ENV_ID = "intersection-v1"
+DEFAULT_ENV_ID = DEFAULT_HIGHWAY_ENV_ID
 DEFAULT_HIGHWAY_CONFIG = {
     "controlled_vehicles": 2,
     "duration": 15,

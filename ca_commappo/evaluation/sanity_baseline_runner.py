@@ -9,6 +9,7 @@ import yaml
 from gymnasium import spaces
 
 from ca_commappo.envs.highway_intersection import (
+    DEFAULT_HIGHWAY_ENV_ID,
     IDLE_ACTION,
     HighwayIntersectionMultiAgentEnv,
 )
@@ -45,7 +46,7 @@ def load_sanity_config(path: str | Path) -> SanityConfig:
     _validate_policies(policies)
 
     return SanityConfig(
-        env_id=str(raw_config.get("env_id", "intersection-v1")),
+        env_id=str(raw_config.get("env_id", DEFAULT_HIGHWAY_ENV_ID)),
         env_seed=env_seed,
         episodes=episodes,
         seeds=seeds,

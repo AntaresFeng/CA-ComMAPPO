@@ -44,7 +44,7 @@
 
 ### 2.1 `ca_commappo/envs/highway_intersection.py` — 环境适配器
 
-将 highway-env 的 `intersection-v1` 包装为 XuanCe `RawMultiAgentEnv`。
+默认将 highway-env 的 `intersection-multi-agent-v1` 包装为 XuanCe `RawMultiAgentEnv`；显式传入 `intersection-v1` 时仍保留兼容路径，但主线配置不再使用它。
 
 - **`HighwayIntersectionMultiAgentEnv`**（L63-249）
   - 读 `env_config`（duck-typed Namespace）的 `env_id` / `render_mode` / `flatten_observations` / `highway_config`。
@@ -104,7 +104,7 @@
 - **`train()`**（L139-144）：只调 `agents.train()` + 可选 `save_model("final_train_model.pth")`，**不评估**。
 - **`benchmark()`**（L159-208）：周期性 `agents.test()`，但**只用 episode reward mean/std 选 best model，不调 highway_metrics**。
 - **`test()`**（L147-156）：加载模型，只打印 `Mean Score / Std`。
-- `--env-id` 默认 `intersection_v1`（下划线，L23）；yaml 里 `env_id: intersection-v1`（连字符）；`env_name: HighwayIntersection`——**四种含义混在一处**。
+- `--env-id` 默认 `intersection-multi-agent-v1`，内置配置文件名和 YAML 里的 highway `env_id` 已对齐；`env_name: HighwayIntersection` 仍是 XuanCe 注册名。
 
 ### 2.9 三个不可运行的 mappo example
 
@@ -129,7 +129,7 @@
 | 语义 | 定义处 | 硬编码处 | 风险 |
 |---|---|---|---|
 | IDLE 动作 = 1 | `highway_intersection.py:13`（`IDLE_ACTION=1`） | `sanity_baseline_runner.py:61`（`{agent: 1}`） | 动作表变动时两处须同步改，无断言 |
-| `"intersection-v1"` 默认可信值 | `highway_intersection.py:68` | `sanity_baseline_runner.py:50`（YAML env_id） | 无共享默认常量的真源 |
+| highway-env 默认 id | `DEFAULT_HIGHWAY_ENV_ID` | adapter、sanity runner、debug wrapper、MAPPO 训练入口复用 | 已有共享默认常量 |
 
 ### 3.3 三处分散的打印格式
 
@@ -194,16 +194,16 @@
 
 无共享默认常量的真源，同一语义不同默认值。
 
-### 4.6 env_id 命名分裂
+### 4.6 env_id 命名已收敛，仍需区分 XuanCe 注册名
 
 | 出现位置 | 字符串 | 用途 |
 |---|---|---|
-| `mappo_highway_intersection.py` argparse `--env-id` 默认值 | `intersection_v1` | 下划线，用于找 config 文件名 |
-| mappo yaml `env_id` 字段 | `intersection-v1` | 连字符，传给 `gym.make` |
+| `mappo_highway_intersection.py` argparse `--env-id` 默认值 | `intersection-multi-agent-v1` | 同时用于找同名内置 config 文件 |
+| mappo yaml `env_id` 字段 | `intersection-multi-agent-v1` | 传给 `gym.make` |
 | mappo yaml `env_name` 字段 | `HighwayIntersection` | XuanCe 注册名 |
 | `register_highway_intersection_env()` 默认参数 | `HighwayIntersection` | 注册表键 |
 
-**四种含义混在一个名字里**，极难追踪。
+highway-env id 和内置配置文件名已经对齐；仍需在文档和代码里明确区分 highway-env id 与 XuanCe 注册名。
 
 ### 4.7 mappo example 职责越界
 
@@ -276,9 +276,9 @@ sanity_baseline_runner.py
    - 三个打印格式、两个 `save_results_json`、两个 `controlled_vehicle_flags`
    - 三套默认配置数值不一致
 
-6. **P2 — 注册无自动副作用 + env_id 命名分裂**
+6. **P2 — 注册无自动副作用 + env_name/env_id 双层概念**
    - import 不触发注册，需调用方显式调用
-   - 四种 env_id 混用
+   - highway-env id 与 XuanCe 注册名仍需调用方理解
 
 7. **P3 — 三个非 highway example 含 bug 不可运行**
    - `parser.env_id` AttributeError

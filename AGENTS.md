@@ -8,7 +8,7 @@
 
 当前仓库已经具备：
 
-- `intersection-v1` 的 XuanCe `RawMultiAgentEnv` 适配器。
+- `intersection-multi-agent-v1` 的 XuanCe `RawMultiAgentEnv` 适配器。
 - XuanCe 环境注册和 `make_envs(...)` 基础兼容。
 - 适配器 reset / step / state 测试。
 - random / idle-only sanity baseline 和基础评估指标。
@@ -36,7 +36,7 @@
 
 所有 `highway-env` 选项应通过 `highway_config` 传入。处理嵌套的 `observation` 和 `action` 字典时要谨慎：本项目会在调用 `gym.make` 前进行深度合并，以保留必要默认值。
 
-`intersection-v1` 当前多智能体动作空间是离散的 `Discrete(3)`，动作语义为 `0=SLOWER`、`1=IDLE`、`2=FASTER`。配置 MAPPO 时应使用离散动作 policy，例如 `Categorical_MAAC_Policy`。
+`intersection-multi-agent-v1` 当前多智能体动作空间是离散的 `Discrete(3)`，动作语义为 `0=SLOWER`、`1=IDLE`、`2=FASTER`。配置 MAPPO 时应使用离散动作 policy，例如 `Categorical_MAAC_Policy`。裸 `intersection-v1` 仍是单智能体连续动作环境；只在显式兼容测试或排查 highway-env 配置行为时使用。
 
 ## 资料源
 

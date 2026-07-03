@@ -17,8 +17,8 @@
 - Move: `examples/debug_highway_env_episode.py` to `ca_commappo/envs/debug_highway_wrapper.py`
 - Move: `examples/mappo/mappo_highway_intersection.py` to `ca_commappo/training/mappo_highway_intersection.py`
 - Move: `examples/sanity/highway_intersection.yaml` to `configs/sanity/highway_intersection.yaml`
-- Move: `examples/mappo/mappo_highway_configs/intersection_v1.yaml` to `configs/mappo/intersection_v1.yaml`
-- Move: `examples/mappo/mappo_highway_configs/intersection_v1_smoke.yaml` to `configs/mappo/intersection_v1_smoke.yaml`
+- Move: `examples/mappo/mappo_highway_configs/intersection_v1.yaml` to `configs/mappo/intersection-multi-agent-v1.yaml`
+- Move: `examples/mappo/mappo_highway_configs/intersection_v1_smoke.yaml` to `configs/mappo/intersection-multi-agent-v1-smoke.yaml`
 
 - [x] Create `ca_commappo/cli`, `ca_commappo/training`, `configs/sanity`, and `configs/mappo`.
 - [x] Move the files with `Move-Item -LiteralPath ...`.
@@ -58,4 +58,4 @@
 - [x] Run `uv run pytest -q`.
 - [x] Run `uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/highway_intersection.yaml --policy all`.
 - [x] Run `uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper --seed 7 --max-steps 1`.
-- [x] Run `uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection_v1_smoke.yaml --mode train --no-save`.
+- [x] Run `uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save`.

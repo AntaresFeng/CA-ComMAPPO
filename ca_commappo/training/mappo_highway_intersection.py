@@ -9,18 +9,20 @@ from xuance.environment import make_envs
 from xuance.torch.agents import MAPPO_Agents
 from xuance.torch.utils.operations import set_seed
 
-from ca_commappo.envs.highway_intersection import register_highway_intersection_env
+from ca_commappo.envs.highway_intersection import (
+    DEFAULT_HIGHWAY_ENV_ID,
+    register_highway_intersection_env,
+)
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "mappo"
-DEFAULT_ENV_ID = "intersection_v1"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run XuanCe MAPPO on highway-env intersection-v1."
+        description="Run XuanCe MAPPO on highway-env multi-agent intersection."
     )
-    parser.add_argument("--env-id", type=str, default=DEFAULT_ENV_ID)
+    parser.add_argument("--env-id", type=str, default=DEFAULT_HIGHWAY_ENV_ID)
     parser.add_argument(
         "--config",
         type=str,
@@ -61,7 +63,7 @@ def config_path_for(env_id: str) -> Path:
 
 
 def load_configs(
-    env_id: str = DEFAULT_ENV_ID,
+    env_id: str = DEFAULT_HIGHWAY_ENV_ID,
     overrides: dict[str, Any] | None = None,
     config_path: str = "",
 ) -> argparse.Namespace:

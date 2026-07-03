@@ -10,6 +10,7 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
 
 DEFAULT_ENV_NAME = "HighwayIntersection"
+DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
 
 
@@ -47,7 +48,7 @@ def _highway_multi_agent_intersection_defaults() -> dict[str, Any]:
 def build_intersection_config(
     highway_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a complete multi-agent config for highway-env intersection-v1.
+    """Build a complete multi-agent config for highway-env intersection.
 
     highway-env 1.11 applies user config with a shallow top-level update, so the
     adapter must create complete nested `observation` and `action` dictionaries
@@ -61,11 +62,11 @@ def build_intersection_config(
 
 
 class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
-    """XuanCe RawMultiAgentEnv adapter for highway-env intersection-v1."""
+    """XuanCe RawMultiAgentEnv adapter for highway-env multi-agent intersection."""
 
     def __init__(self, env_config):
         super().__init__()
-        self.env_id = getattr(env_config, "env_id", "intersection-v1")
+        self.env_id = getattr(env_config, "env_id", DEFAULT_HIGHWAY_ENV_ID)
         self.render_mode = getattr(env_config, "render_mode", None)
         self.flatten_observations = bool(
             getattr(env_config, "flatten_observations", False)
@@ -96,12 +97,12 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
     def _validate_multi_agent_spaces(self) -> None:
         if not isinstance(self.env.observation_space, spaces.Tuple):
             raise ValueError(
-                "intersection-v1 observation_space is not Tuple; ensure "
+                f"{self.env_id} observation_space is not Tuple; ensure "
                 "observation.type is MultiAgentObservation."
             )
         if not isinstance(self.env.action_space, spaces.Tuple):
             raise ValueError(
-                "intersection-v1 action_space is not Tuple; ensure "
+                f"{self.env_id} action_space is not Tuple; ensure "
                 "action.type is MultiAgentAction."
             )
         if len(self.env.observation_space.spaces) != self.num_agents:
@@ -202,15 +203,20 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
     def step(self, action_dict: dict[str, Any]):
         active_before_step = dict(self._active_agents)
         action_tuple = self._actions_to_tuple(action_dict, active_before_step)
-        observation, _reward, terminated_global, truncated, info = self.env.step(
-            action_tuple
-        )
+        # intersection-multi-agent-v1's MultiAgentWrapper returns per-agent
+        # tuples for reward and terminated directly from step().
+        observation, reward, terminated, truncated, info = self.env.step(action_tuple)
         obs_dict = self._obs_tuple_to_agent_dict(observation)
-        raw_rewards = self._tuple_to_agent_dict(info["agents_rewards"])
+        raw_rewards = self._tuple_to_agent_dict(reward)
         rewards = self._mask_rewards(raw_rewards, active_before_step)
-        terminated = self._tuple_to_agent_dict(info["agents_terminated"])
-        info["global_terminated"] = bool(terminated_global)
-        if terminated_global:
+        terminated = self._tuple_to_agent_dict(terminated)
+
+        # Compute environment-level done signal for XuanCe: any crash or
+        # all agents arrived.  MultiAgentWrapper discarded the upstream
+        # scalar terminated, so we recompute from per-agent state.
+        crashed = tuple(bool(v.crashed) for v in self.env.unwrapped.controlled_vehicles)
+        info["global_terminated"] = any(crashed) or all(terminated.values())
+        if info["global_terminated"]:
             terminated = {agent: True for agent in self.agents}
         info["raw_agents_rewards"] = tuple(raw_rewards[agent] for agent in self.agents)
         info["agents_rewards"] = tuple(rewards[agent] for agent in self.agents)
@@ -220,9 +226,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # ignores collisions on all other agents (see abstract.py:179).
         # Replace it with a per-agent tuple so downstream consumers see the
         # true crash state of every controlled vehicle.
-        info["crashed"] = tuple(
-            vehicle.crashed for vehicle in self.env.unwrapped.controlled_vehicles
-        )
+        info["crashed"] = crashed
         self._last_agent_mask = active_before_step
         self._active_agents = {
             agent: active_before_step[agent] and not bool(terminated[agent])

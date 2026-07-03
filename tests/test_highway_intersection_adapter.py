@@ -16,11 +16,10 @@ def test_default_highway_config_matches_runtime_env_config():
     expected_config = json.loads(
         Path("tests/default_config.json").read_text(encoding="utf-8")
     )
-    env = HighwayIntersectionMultiAgentEnv(
-        Namespace(env_id="intersection-v1", highway_config={})
-    )
+    env = HighwayIntersectionMultiAgentEnv(Namespace(highway_config={}))
 
     try:
+        assert env.env_id == "intersection-multi-agent-v1"
         assert env.env.unwrapped.config == expected_config
     finally:
         env.close()
@@ -60,16 +59,15 @@ def test_build_config_deep_merges_highway_overrides():
     assert config["action"]["action_config"]["target_speeds"] == [0, 5, 10]
 
 
-def test_adapter_uses_intersection_v1_with_configurable_agent_count_and_target_speeds():
+def test_adapter_uses_multi_agent_intersection_by_default():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             highway_config={"controlled_vehicles": 3},
         )
     )
 
     try:
-        assert env.env_id == "intersection-v1"
+        assert env.env_id == "intersection-multi-agent-v1"
         assert env.num_agents == 3
         assert env.agents == ["agent_0", "agent_1", "agent_2"]
         assert isinstance(env.env.observation_space, Tuple)
@@ -92,10 +90,28 @@ def test_adapter_uses_intersection_v1_with_configurable_agent_count_and_target_s
         env.close()
 
 
-def test_reset_step_and_state_are_xuance_compatible():
+def test_adapter_keeps_intersection_v1_compatible_when_explicitly_requested():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
             env_id="intersection-v1",
+            highway_config={"controlled_vehicles": 3},
+        )
+    )
+
+    try:
+        assert env.env_id == "intersection-v1"
+        assert env.env.unwrapped.__class__.__name__ == "ContinuousIntersectionEnv"
+        assert isinstance(env.env.observation_space, Tuple)
+        assert isinstance(env.env.action_space, Tuple)
+        assert len(env.env.observation_space.spaces) == 3
+        assert len(env.env.action_space.spaces) == 3
+    finally:
+        env.close()
+
+
+def test_reset_step_and_state_are_xuance_compatible():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
             highway_config={"controlled_vehicles": 3, "duration": 2},
         )
     )
@@ -123,7 +139,6 @@ def test_reset_step_and_state_are_xuance_compatible():
 def test_flatten_observations_option_exposes_one_dimensional_spaces_and_obs():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             flatten_observations=True,
             highway_config={
                 "controlled_vehicles": 2,
@@ -160,7 +175,6 @@ def test_flatten_observations_option_exposes_one_dimensional_spaces_and_obs():
 def test_collision_global_termination_marks_all_agents_done():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             highway_config={
                 "controlled_vehicles": 3,
                 "duration": 13,
@@ -192,7 +206,6 @@ def test_collision_global_termination_marks_all_agents_done():
 def test_arrival_rewards_and_termination_match_highway_info():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             highway_config={
                 "controlled_vehicles": 3,
                 "duration": 13,
@@ -257,7 +270,6 @@ def test_arrival_rewards_and_termination_match_highway_info():
 def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             highway_config={
                 "controlled_vehicles": 3,
                 "duration": 13,
@@ -309,7 +321,6 @@ def test_register_highway_intersection_env_with_xuance_make_envs():
     envs = make_envs(
         Namespace(
             env_name="HighwayIntersection",
-            env_id="intersection-v1",
             env_seed=1,
             parallels=1,
             vectorize="DummyVecMultiAgentEnv",
@@ -331,7 +342,6 @@ def test_register_highway_intersection_env_with_xuance_make_envs():
 def test_render_accepts_xuance_render_mode_argument():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
-            env_id="intersection-v1",
             render_mode="rgb_array",
             highway_config={"controlled_vehicles": 2, "duration": 2},
         )

@@ -5,43 +5,56 @@ wandb_user_name: "your_user_name"
 render: true
 render_mode: "rgb_array"
 fps: 15
-device: "cpu"
+test_mode: false
+device: "cuda:0"
 distributed_training: false
+master_port: "12355"
 
 agent: "MAPPO"
 env_name: "HighwayIntersection"
-env_id: "intersection-v1"
+env_id: "intersection-multi-agent-v1"
 env_seed: 1
-vectorize: "DummyVecMultiAgentEnv"
-
+continuous_action: false
 learner: "MAPPO_Learner"
 policy: "Categorical_MAAC_Policy"
 representation: "Basic_MLP"
+vectorize: "DummyVecMultiAgentEnv"
+
 use_rnn: false
+rnn: "GRU"
+fc_hidden_sizes: [64, 64, 64]
+recurrent_hidden_size: 64
+N_recurrent_layers: 1
+dropout: 0
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+flatten_observations: true
+representation_hidden_size: [128, 128]
+actor_hidden_size: [128, 128]
+critic_hidden_size: [128, 128]
+activation: "relu"
 use_parameter_sharing: true
 use_actions_mask: false
 use_global_state: true
 
-flatten_observations: true
-representation_hidden_size: [64, 64]
-actor_hidden_size: [64, 64]
-critic_hidden_size: [64, 64]
-activation: "relu"
-normalize: "LayerNorm"
-
 seed: 1
-parallels: 1
-buffer_size: 8
-n_epochs: 1
-n_minibatch: 1
+parallels: 4
+buffer_size: 1024
+n_epochs: 4
+n_minibatch: 4
 learning_rate: 0.0003
 weight_decay: 0
-gamma: 0.99
-gae_lambda: 0.95
-clip_range: 0.2
+
 vf_coef: 0.5
 ent_coef: 0.01
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
 
+# tricks
 use_linear_lr_decay: false
 end_factor_lr_decay: 0.5
 use_value_clip: true
@@ -51,29 +64,34 @@ use_huber_loss: true
 huber_delta: 10.0
 use_advnorm: true
 use_gae: true
+gae_lambda: 0.95
 use_grad_clip: true
 grad_clip_norm: 10.0
 
-running_steps: 16
-eval_interval: 16
-test_episode: 1
+running_steps: 10000000
+eval_interval: 10000
+test_episode: 5
 
 log_dir: "logs/mappo_highway/"
 model_dir: "models/mappo_highway/"
 
 highway_config:
-  controlled_vehicles: 3
-  duration: 13
+  controlled_vehicles: 2
+  duration: 20
   initial_vehicle_count: 10
   spawn_probability: 0.6
-  collision_reward: -5
-  high_speed_reward: 1
-  arrived_reward: 1
+  collision_reward: -10
+  high_speed_reward: 0.5
+  reward_speed_range: [5.0, 9.0]
+  arrived_reward: 5
   normalize_reward: false
   observation:
+    type: "MultiAgentObservation"
     observation_config:
+      absolute: true
       vehicles_count: 15
       features: ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"]
   action:
+    type: "MultiAgentAction"
     action_config:
       target_speeds: [0, 4.5, 9]

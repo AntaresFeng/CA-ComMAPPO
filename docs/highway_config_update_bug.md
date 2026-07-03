@@ -2,6 +2,10 @@
 
 Date checked: 2026-06-28
 
+Current project default: `intersection-multi-agent-v1`. This note documents
+the legacy/bare `intersection-v1` behavior and why the adapter still builds a
+complete nested multi-agent config before calling `gym.make(...)`.
+
 ## Finding
 
 `highway-env==1.11` merges user config with a top-level shallow update in
