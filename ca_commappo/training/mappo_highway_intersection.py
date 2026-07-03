@@ -9,7 +9,7 @@ from xuance.environment import make_envs
 from xuance.torch.agents import MAPPO_Agents
 from xuance.torch.utils.operations import set_seed
 
-from ca_commappo.envs.highway_intersection import DEFAULT_HIGHWAY_ENV_ID
+from ca_commappo.envs.highway_intersection_wrapper import DEFAULT_HIGHWAY_ENV_ID
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
 

@@ -8,7 +8,7 @@ import numpy as np
 import yaml
 from gymnasium import spaces
 
-from ca_commappo.envs.highway_intersection import (
+from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     IDLE_ACTION,
     HighwayIntersectionMultiAgentEnv,

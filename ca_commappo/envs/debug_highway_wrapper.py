@@ -10,7 +10,7 @@ import highway_env  # noqa: F401 - importing registers highway-env ids.
 import numpy as np
 from gymnasium import spaces
 
-from ca_commappo.envs.highway_intersection import (
+from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     HighwayIntersectionMultiAgentEnv,
     build_intersection_config,

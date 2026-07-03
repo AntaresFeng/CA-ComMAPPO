@@ -1,6 +1,6 @@
 """Environment adapters for CA-ComMAPPO."""
 
-from ca_commappo.envs.highway_intersection import (
+from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     HighwayIntersectionMultiAgentEnv,
     build_intersection_config,

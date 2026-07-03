@@ -5,7 +5,7 @@ from pathlib import Path
 from gymnasium.spaces import Tuple
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, make_envs
 
-from ca_commappo.envs.highway_intersection import (
+from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_ENV_NAME,
     HighwayIntersectionMultiAgentEnv,
     build_intersection_config,
