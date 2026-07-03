@@ -264,3 +264,6 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
 def register_highway_intersection_env(env_name: str = DEFAULT_ENV_NAME) -> None:
     REGISTRY_MULTI_AGENT_ENV[env_name] = HighwayIntersectionMultiAgentEnv
+
+
+register_highway_intersection_env()

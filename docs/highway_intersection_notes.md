@@ -28,3 +28,13 @@
   `speed=10.0`、`speed_index=2`、`target_speed=9.0`。
 
 运行时检查也符合这个结论：受控车 reset 在最高目标速度挡位，背景车速度随 seed、生成位置和 warm up 仿真变化。
+
+## Adapter reward contract
+
+`HighwayIntersectionMultiAgentEnv.step()` 面向 XuanCe 训练语义返回 reward：
+
+- 返回值里的 `rewards` 字典是 masked reward。
+- `info["agents_rewards"]` 与返回的 `rewards` 保持一致，也是 masked reward tuple。
+- `info["raw_agents_rewards"]` 保存 highway-env 原始 per-agent reward tuple。
+- agent 到达或终止后的下一步开始会被视为 inactive：adapter 会用 `IDLE_ACTION` 代替其动作，并把该 agent 的 adapter-facing reward 置为 `0.0`。
+- `info["global_terminated"]` 是环境级结束信号；`info["crashed"]` 是 per-agent crash tuple，不使用 highway-env 默认的单车 `info["crashed"]` 语义。

@@ -38,6 +38,8 @@
 
 `intersection-multi-agent-v1` 当前多智能体动作空间是离散的 `Discrete(3)`，动作语义为 `0=SLOWER`、`1=IDLE`、`2=FASTER`。配置 MAPPO 时应使用离散动作 policy，例如 `Categorical_MAAC_Policy`。裸 `intersection-v1` 仍是单智能体连续动作环境；只在显式兼容测试或排查 highway-env 配置行为时使用。
 
+适配器 reward contract 已定稿：`step()` 返回的 `rewards` 和 `info["agents_rewards"]` 都是 masked adapter-facing reward；inactive agent 后续 reward 为 `0.0`。原始 highway-env per-agent reward 保存在 `info["raw_agents_rewards"]`。不要把 `info["agents_rewards"]` 当作未处理的 highway 原始字段使用。
+
 ## 资料源
 
 - [xuance GitHub 仓库](https://github.com/agi-brain/xuance): 最新最全，仓库里的 examples/mappo 已经放在本地，可参考

@@ -3,12 +3,12 @@ from argparse import Namespace
 from pathlib import Path
 
 from gymnasium.spaces import Tuple
-from xuance.environment import make_envs
+from xuance.environment import REGISTRY_MULTI_AGENT_ENV, make_envs
 
 from ca_commappo.envs.highway_intersection import (
+    DEFAULT_ENV_NAME,
     HighwayIntersectionMultiAgentEnv,
     build_intersection_config,
-    register_highway_intersection_env,
 )
 
 
@@ -301,7 +301,7 @@ def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
         }
         assert agent_mask == {agent: True for agent in env.agents}
 
-        _obs, rewards, _terminated, _truncated, _step_info = env.step(
+        _obs, rewards, _terminated, _truncated, step_info = env.step(
             {agent: 1 for agent in env.agents}
         )
 
@@ -312,12 +312,20 @@ def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
         }
         assert rewards["agent_1"] == 0.0
         assert rewards["agent_2"] == 0.0
+        assert (
+            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
+        )
+        assert step_info["agents_rewards"] == (1, 0.0, 0.0)
+        assert step_info["raw_agents_rewards"] == (1, 1, 1)
     finally:
         env.close()
 
 
-def test_register_highway_intersection_env_with_xuance_make_envs():
-    register_highway_intersection_env()
+def test_highway_intersection_env_auto_registers_with_xuance_make_envs():
+    assert (
+        REGISTRY_MULTI_AGENT_ENV[DEFAULT_ENV_NAME] is HighwayIntersectionMultiAgentEnv
+    )
+
     envs = make_envs(
         Namespace(
             env_name="HighwayIntersection",
