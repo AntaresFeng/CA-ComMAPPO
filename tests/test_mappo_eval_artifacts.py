@@ -187,3 +187,28 @@ def test_build_eval_record_supports_requested_positional_signature():
     assert record["step"] == 42
     assert record["is_initial_eval"] is False
     assert record["is_best"] is True
+
+
+def test_test_mode_record_uses_null_epoch_and_best_true():
+    result = {
+        "scores": [1.0],
+        "summary": {"episodes": 1, "collision_rate": 0.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    record = build_eval_record(
+        mode="test",
+        phase="test",
+        epoch=None,
+        step=42,
+        is_initial_eval=False,
+        is_best=True,
+        eval_result=result,
+    )
+
+    assert record["mode"] == "test"
+    assert record["phase"] == "test"
+    assert record["epoch"] is None
+    assert record["step"] == 42
+    assert record["is_initial_eval"] is False
+    assert record["is_best"] is True

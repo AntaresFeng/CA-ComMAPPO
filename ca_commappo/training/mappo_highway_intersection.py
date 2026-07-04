@@ -16,6 +16,12 @@ from ca_commappo.evaluation.mappo_highway_metrics import (
     evaluate_highway_policy,
     is_better_highway_summary,
 )
+from ca_commappo.evaluation.mappo_eval_artifacts import (
+    append_eval_record_jsonl,
+    build_eval_metadata,
+    build_eval_record,
+    write_eval_metadata,
+)
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
 
@@ -114,6 +120,16 @@ def print_train_information(configs: argparse.Namespace) -> None:
         print(f"{key}: {value}")
 
 
+def write_eval_run_metadata(
+    configs: argparse.Namespace,
+    agents: MAPPO_Agents,
+    mode: str,
+) -> None:
+    metadata = build_eval_metadata(configs=configs, agents=agents, mode=mode)
+    metadata_path = write_eval_metadata(metadata, agents.log_dir)
+    print(f"Eval metadata saved: {metadata_path}")
+
+
 def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -> None:
     train_steps = max(1, configs.running_steps // configs.parallels)
     agents.train(train_steps)
@@ -125,6 +141,7 @@ def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -
 def test(configs: argparse.Namespace, agents: MAPPO_Agents, envs) -> None:
     model_path = getattr(configs, "model_dir_load", configs.model_dir)
     agents.load_model(path=model_path)
+    write_eval_run_metadata(configs, agents, mode="test")
     result = evaluate_highway_policy(
         agents=agents,
         envs=envs,
@@ -132,9 +149,20 @@ def test(configs: argparse.Namespace, agents: MAPPO_Agents, envs) -> None:
         phase="test",
         log_prefix="Test-Highway",
     )
+    record = build_eval_record(
+        mode="test",
+        phase="test",
+        epoch=None,
+        step=agents.current_step,
+        is_initial_eval=False,
+        is_best=True,
+        eval_result=result,
+    )
+    records_path = append_eval_record_jsonl(record, agents.log_dir)
     scores = result["scores"]
     print(f"Mean Score: {np.mean(scores)}, Std: {np.std(scores)}")
     print_highway_summary(result["summary"])
+    print(f"Eval records saved: {records_path}")
     print("Finish testing.")
 
 
