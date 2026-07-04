@@ -15,12 +15,33 @@ from ca_commappo.evaluation.mappo_eval_artifacts import (
     json_safe,
     write_eval_metadata,
 )
+from ca_commappo.training import mappo_highway_intersection as mappo_training
 
 
 class FakeAgent:
     def __init__(self, log_dir: Path):
         self.log_dir = str(log_dir)
         self.current_step = 42
+
+
+class FakeBenchmarkAgent:
+    def __init__(self, log_dir: Path):
+        self.log_dir = str(log_dir)
+        self.current_step = 0
+
+    def train(self, steps: int):
+        self.current_step += steps
+
+    def save_model(self, *args, **kwargs):
+        raise AssertionError("save_model should not be called when save_model=False")
+
+
+class FakeBenchmarkEnv:
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
 
 
 def test_eval_artifact_paths_use_agent_log_dir(tmp_path):
@@ -256,3 +277,87 @@ def test_benchmark_epoch_record_marks_non_initial_best_status():
     assert record["epoch"] == 1
     assert record["is_initial_eval"] is False
     assert record["is_best"] is False
+
+
+def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
+    tmp_path, monkeypatch
+):
+    configs = Namespace(
+        env_name="HighwayIntersection",
+        env_id="intersection-multi-agent-v1",
+        seed=3,
+        logger="tensorboard",
+        running_steps=16,
+        parallels=1,
+        eval_interval=16,
+        test_episode=1,
+    )
+    agent = FakeBenchmarkAgent(tmp_path / "benchmark_run")
+    fake_env = FakeBenchmarkEnv()
+    eval_results = [
+        {
+            "scores": [0.1],
+            "summary": {"episodes": 1, "arrival_rate": 0.0},
+            "episodes": [{"episode_index": 0}],
+        },
+        {
+            "scores": [0.9],
+            "summary": {"episodes": 1, "arrival_rate": 1.0},
+            "episodes": [{"episode_index": 0}],
+        },
+    ]
+
+    monkeypatch.setattr(mappo_training, "make_envs", lambda _configs: fake_env)
+    monkeypatch.setattr(
+        mappo_training,
+        "evaluate_highway_policy",
+        lambda **_kwargs: eval_results.pop(0),
+    )
+
+    mappo_training.benchmark(configs, agent, save_model=False)
+
+    metadata_path = tmp_path / "benchmark_run" / EVAL_METADATA_FILENAME
+    records_path = tmp_path / "benchmark_run" / EVAL_RECORDS_FILENAME
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    rows = [
+        json.loads(line)
+        for line in records_path.read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert metadata["mode"] == "benchmark"
+    assert len(rows) == 2
+    assert rows[0]["epoch"] == 0
+    assert rows[0]["is_initial_eval"] is True
+    assert rows[0]["is_best"] is True
+    assert rows[0]["step"] == 0
+    assert rows[1]["epoch"] == 1
+    assert rows[1]["is_initial_eval"] is False
+    assert rows[1]["is_best"] is True
+    assert rows[1]["step"] == 16
+    assert fake_env.closed is True
+
+
+def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypatch):
+    configs = Namespace(
+        env_name="HighwayIntersection",
+        env_id="intersection-multi-agent-v1",
+        seed=3,
+        logger="tensorboard",
+        running_steps=16,
+        parallels=1,
+        eval_interval=16,
+        test_episode=1,
+    )
+    agent = FakeBenchmarkAgent(tmp_path / "benchmark_run")
+    fake_env = FakeBenchmarkEnv()
+
+    def fail_metadata(*_args, **_kwargs):
+        raise RuntimeError("metadata failed")
+
+    monkeypatch.setattr(mappo_training, "make_envs", lambda _configs: fake_env)
+    monkeypatch.setattr(mappo_training, "write_eval_run_metadata", fail_metadata)
+
+    with pytest.raises(RuntimeError, match="metadata failed"):
+        mappo_training.benchmark(configs, agent, save_model=False)
+
+    assert fake_env.closed is True

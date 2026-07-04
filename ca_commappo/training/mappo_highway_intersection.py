@@ -195,8 +195,8 @@ def benchmark(
     configs_test = deepcopy(configs)
     configs_test.parallels = configs_test.test_episode
     test_envs = make_envs(configs_test)
-    write_eval_run_metadata(configs, agents, mode="benchmark")
     try:
+        write_eval_run_metadata(configs, agents, mode="benchmark")
         train_steps = max(1, configs.running_steps // configs.parallels)
         eval_interval = max(1, configs.eval_interval // configs.parallels)
         num_epoch = max(1, int(train_steps / eval_interval))
