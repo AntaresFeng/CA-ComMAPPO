@@ -215,6 +215,10 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # all agents arrived.  MultiAgentWrapper discarded the upstream
         # scalar terminated, so we recompute from per-agent state.
         crashed = tuple(bool(v.crashed) for v in self.env.unwrapped.controlled_vehicles)
+        arrived = tuple(
+            self.env.unwrapped.has_arrived(v)
+            for v in self.env.unwrapped.controlled_vehicles
+        )
         info["global_terminated"] = any(crashed) or all(terminated.values())
         if info["global_terminated"]:
             terminated = {agent: True for agent in self.agents}
@@ -227,6 +231,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # Replace it with a per-agent tuple so downstream consumers see the
         # true crash state of every controlled vehicle.
         info["crashed"] = crashed
+        info["arrived"] = arrived
         self._last_agent_mask = active_before_step
         self._active_agents = {
             agent: active_before_step[agent] and not bool(terminated[agent])

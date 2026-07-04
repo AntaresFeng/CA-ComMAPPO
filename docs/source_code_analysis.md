@@ -50,7 +50,7 @@
   - 读 `env_config`（duck-typed Namespace）的 `env_id` / `render_mode` / `flatten_observations` / `highway_config`。
   - `build_intersection_config()` 组装嵌套 config → `gym.make()` 造底层 env。
   - `controlled_vehicles` 决定 agent 数，命名 `agent_0..agent_{n-1}`，单组 CTDE。
-  - **step**：调底层 step → 取 per-agent reward → `_mask_rewards` 对 inactive 置 0 → 返回的 `rewards` 和 `info["agents_rewards"]` 都使用 masked adapter-facing reward → 原始 highway reward 放 `info["raw_agents_rewards"]` → `terminated` 取 per-agent terminated → `info["global_terminated"]` 表示环境级结束 → `truncated` 透传标量 → 更新 `_active_agents` 状态机。
+  - **step**：调底层 step → 取 per-agent reward → `_mask_rewards` 对 inactive 置 0 → 返回的 `rewards` 和 `info["agents_rewards"]` 都使用 masked adapter-facing reward → 原始 highway reward 放 `info["raw_agents_rewards"]` → `terminated` 取 per-agent terminated → `info["global_terminated"]` 表示环境级结束 → `info["crashed"]` / `info["arrived"]` 暴露 per-agent episode facts → `truncated` 透传标量 → 更新 `_active_agents` 状态机。
   - `state()`（L225-230）= 各 agent obs 拼接（**不是真正全局状态，不含非受控车**）。
   - `IDLE_ACTION = 1`（L13）硬编码，假设 highway 动作表 `{0:SLOWER,1:IDLE,2:FASTER}`。
 - **`build_intersection_config()`**（L47-60）：合并默认 config + 用户 override，校验 `controlled_vehicles > 0`。
@@ -63,9 +63,9 @@
 ### 2.3 `ca_commappo/evaluation/sanity_baseline_runner.py` — Sanity baseline 执行器
 
 - **`SUPPORTED_POLICIES = ("random", "idle-only")`**。`idle-only` 使用从 adapter 导入的 `IDLE_ACTION`。
-- **`run_episode()`**（L73-119）：每步调 `controlled_vehicle_flags` + `episode_outcome`，命中 collision/arrival/truncated 即 break。**break 用原始 `truncated`（L98），与 `episode_outcome` 去过 collision/arrival 的 `truncated` 语义不同**。
+- **`run_episode()`**（L73-119）：每步从 adapter step info 读取 `info["crashed"]` / `info["arrived"]`，命中 collision/arrival/truncated 即 break。episode record 和 summary 交给共享 `highway_metrics` helper。
 - **`run_sanity_baseline()`**（L122-153）：三层循环（policy × seed × episode），用 `summarize_episode_records` 聚合。`episode_seed = base_seed + episode_index * len(config.seeds)`（L140），与 record 的 `episode_index` 字段（L145）两套编号。
-- **`_controlled_vehicle_flags`**（L171-174）：对 `controlled_vehicle_flags` 的**纯冗余透传包装**，一行转发无任何额外逻辑。
+- 旧的 `_controlled_vehicle_flags` / `controlled_vehicle_flags` sanity 路径已移除；sanity runner 不再穿透底层 env 读取车辆状态。
 - **`_make_env`**（L165-168）：用 `argparse.Namespace` 手搓 env_config，**不传 `flatten_observations` / `render_mode` / `env_seed`**，adapter 大半开关未用。
 
 ### 2.4 `main.py` — 顶层 CLI
@@ -85,7 +85,7 @@
 
 - 单 episode 逐帧打印，支持 `--target raw / wrapper / both`。
 - `raw` 用 `gym.make`；`wrapper` 用 `HighwayIntersectionMultiAgentEnv`，当前 argparse 描述已改为 CA-ComMAPPO adapter。
-- 所有统计本地实现。`controlled_vehicle_flags` 与 sanity runner 内部 `_controlled_vehicle_flags` 逻辑重复，尚未抽取共享指标模块。
+- raw debug 目标仍可直接打印底层车辆状态；wrapper/sanity/MAPPO 评估路径应消费 adapter 暴露的 `info["crashed"]` / `info["arrived"]`，指标汇总逻辑由共享 `highway_metrics` 模块负责。
 - 默认 `controlled_vehicles=2`、`duration=15`（L21-27），与 sanity yaml（3、13）不一致。
 
 ### 2.7 `examples/evaluate_highway_intersection.py` — 已删除，待后续重构
@@ -116,7 +116,7 @@
 
 | 代码片段 | 位置 1 | 位置 2 | 差异 |
 |---|---|---|---|
-| `controlled_vehicle_flags`（读 `crashed` / `has_arrived`） | `sanity_baseline_runner.py` | `debug_highway_wrapper.py` | 逻辑重复，尚未抽取共享指标模块 |
+| 车辆状态读取 | adapter `step()` / debug raw 目标 | sanity/MAPPO 消费 adapter `info` | 训练评估不再重复穿透底层 env；debug raw 仍用于人工探查 |
 
 ### 3.2 语义重复 / 未共享常量的代码
 
@@ -149,19 +149,18 @@
 | `ca_commappo/cli/run_sanity_baseline.py` | 跑 random + idle-only 进行兜底评估 | 已从 `examples/` 迁出 |
 | `ca_commappo/envs/debug_highway_wrapper.py` | 直接 new `HighwayIntersectionMultiAgentEnv`，无 XuanCe | 描述已改为 CA-ComMAPPO adapter |
 
-### 4.2 环境层 vs 评估层终止语义双轨
+### 4.2 Episode Fact 边界已收敛到 adapter
 
 ```
 环境 adapter (highway_intersection.py):
-    step() → info["agents_terminated"] / info["global_terminated"] / _active_agents 状态机
+    step() → info["agents_terminated"] / info["global_terminated"] / info["crashed"] / info["arrived"] / _active_agents 状态机
 
-评估层 (sanity/debug helper):
-    controlled_vehicle_flags() → 穿透 _unwrap_base_env 直接读底层 vehicle.crashed / has_arrived(v)
-                                 不直接消费 adapter 的 terminated 字段
+评估层 (sanity/MAPPO evaluator/callback):
+    只消费 adapter step info 里的 per-agent episode facts，再交给 highway_metrics 聚合
 ```
 - adapter 对 `terminated` 加了"全局 terminated 时强制全员 True"的语义（L213-214）
-- evaluation 另行用 `crashed` / `arrived` 推断 outcome
-- **两套终止语义无交叉验证，adapter 改终止语义不影响 evaluation 判定，反之亦然**
+- `crashed` / `arrived` 的 raw highway-env 状态读取集中在 adapter，sanity 和 MAPPO 评估不再自行穿透 env。
+- 这样可以让 Dummy/Subproc vector env、XuanCe callback、sanity baseline 使用同一份 episode fact contract。
 
 ### 4.3 `info["agents_rewards"]` 语义已定稿
 
@@ -258,15 +257,15 @@ sanity_baseline_runner.py
    - mean_episode_reward 口径与训练侧不对齐
    - baseline vs MAPPO 无对照表设计
 
-3. **P1 — 终止语义双轨运行**
-   - adapter `_active_agents` 状态机 vs evaluation 穿透读 `crashed`/`has_arrived`
-   - 无交叉验证，adapter 修改终止逻辑不影响 evaluation，反之亦然
+3. **P1 — 终止语义已收敛到 adapter fact contract**
+   - adapter `_active_agents` 状态机、`info["global_terminated"]`、`info["crashed"]`、`info["arrived"]` 是 sanity/MAPPO 评估共同依赖的 episode 边界。
+   - 后续改 adapter 终止语义时，应同步保持这些 `info` 字段和测试断言。
 
 4. **P1 — `info["agents_rewards"]` 语义已定稿**
    - 当前 contract：返回 `rewards` 和 `info["agents_rewards"]` 都是 masked，`info["raw_agents_rewards"]` 保存原始 highway reward。
 
 5. **P2 — 大量重复代码 + 配置不共享真源**
-   - 三个打印格式、两个 `save_results_json`、两个 `controlled_vehicle_flags`
+   - 三个打印格式、两个 `save_results_json`；训练/评估指标汇总正在向共享 `highway_metrics` 收敛
    - 三套默认配置数值不一致
 
 6. **P2 — env_name/env_id 双层概念仍需理解**
@@ -285,7 +284,7 @@ sanity_baseline_runner.py
 
 1. **`sanity_baseline_runner.py`**
    - `idle-only` 动作 1 改为 import `IDLE_ACTION` 引用
-   - 删除冗余 `_controlled_vehicle_flags` 包装
+   - 已删除冗余 `_controlled_vehicle_flags` 包装，改为消费 adapter step info
    - break 条件中的 `truncated` 与 `episode_outcome` 对齐语义
 
 2. **评估后处理链路**
@@ -293,7 +292,7 @@ sanity_baseline_runner.py
    - 后续应重新设计 MAPPO rollout JSON 输出和汇总入口。
 
 3. **`ca_commappo/envs/debug_highway_wrapper.py`**
-   - `controlled_vehicle_flags` 抽取到共享指标模块
+   - raw 目标保留底层车辆探查逻辑；wrapper 目标应以 adapter `info["crashed"]` / `info["arrived"]` 为准
    - argparse description 中 "XuanCe wrapper" 措辞已在结构迁移中修正
 
 4. **共享指标模块**
@@ -322,9 +321,8 @@ sanity_baseline_runner.py
    - 统一 reward 口径（统一用 `sum(agent_rewards)/num_agents` per episode then average）
 
 10. **终止语义统一**
-    - 决策：adapter 的 `terminated`/`_active_agents` 是权威状态，还是 evaluation 的 `crashed`/`has_arrived` 是权威
-    - 选一个方向：要么 evaluation 消费 adapter 暴露的字段，要么 adapter 暴露足够信息给 evaluation 不需穿透
-    - 添加双向校验断言（`terminated[agent] == crashed[agent] or has_arrived[agent]`）
+    - 已选方向：adapter 是 episode fact 的统一出口，evaluation 消费 adapter 暴露的字段，不再穿透底层 env。
+    - 添加或保留断言，确保 `info["crashed"]` / `info["arrived"]` 与 `terminated`、`global_terminated`、mask 行为一致。
 
 ---
 
@@ -339,7 +337,7 @@ sanity_baseline_runner.py
 | `highway_intersection.py` | step | `raw_agents_rewards` 存原始 highway reward |
 | `highway_intersection.py` | module import | 默认 `HighwayIntersection` 自动注册 |
 | `sanity_baseline_runner.py` | L61 | `{agent: 1}` 独立硬编码 IDLE 动作 |
-| `sanity_baseline_runner.py` | L171-174 | 冗余包装 `_controlled_vehicle_flags` |
+| `sanity_baseline_runner.py` | 旧 L171-174 | 冗余 `_controlled_vehicle_flags` 已移除；当前消费 adapter info |
 | `sanity_baseline_runner.py` | L98 | break 用原始 `truncated`，与 outcome 语义不同 |
 | `mappo_highway_intersection.py` | L111-136 | monkey-patch 藏在 example 里 |
 | `mappo_highway_intersection.py` | L139-144 | train() 不评估，只 `.pth` |

@@ -75,16 +75,17 @@ summary 输出：
 
 ## Collision And Arrival Source
 
-碰撞和到达不使用 `info["crashed"]` 作为主源。
+raw highway-env 的 `info["crashed"]` 不作为主源。
 
-原因：`info["crashed"]` 来自 highway-env abstract env 的单车字段，在多受控车辆场景下可能不能代表所有 agent。实际探查中出现过某个受控车辆已经 `vehicle.crashed == True`，但 `info["crashed"] == False` 的情况。
+原因：raw highway-env 的该字段来自 abstract env 的单车字段，在多受控车辆场景下可能不能代表所有 agent。实际探查中出现过某个受控车辆已经 `vehicle.crashed == True`，但 raw `info["crashed"] == False` 的情况。
 
-正式统计使用：
+本项目坚持由 `HighwayIntersectionMultiAgentEnv` adapter 作为 episode fact 的统一出口。adapter 会将 raw highway-env 的车辆状态转换为 per-agent tuple，并通过 `info["crashed"]` 和 `info["arrived"]` 暴露给上层。sanity baseline、MAPPO callback 和 MAPPO evaluator 都消费这两个 adapter-facing 字段，不再穿透 env 或通过共享 helper 读取 `controlled_vehicles`。
+
+正式统计入口使用：
 
 ```python
-base_env = env.env.unwrapped
-crashed = [bool(vehicle.crashed) for vehicle in base_env.controlled_vehicles]
-arrived = [bool(base_env.has_arrived(vehicle)) for vehicle in base_env.controlled_vehicles]
+crashed = info["crashed"]
+arrived = info["arrived"]
 ```
 
 episode 结束语义与 highway-env intersection 保持一致：
