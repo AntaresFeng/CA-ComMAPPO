@@ -130,6 +130,28 @@ def write_eval_run_metadata(
     print(f"Eval metadata saved: {metadata_path}")
 
 
+def append_eval_run_record(
+    *,
+    agents: MAPPO_Agents,
+    mode: str,
+    phase: str,
+    epoch: int | None,
+    is_initial_eval: bool,
+    is_best: bool,
+    eval_result: dict[str, Any],
+) -> Path:
+    record = build_eval_record(
+        mode=mode,
+        phase=phase,
+        epoch=epoch,
+        step=agents.current_step,
+        is_initial_eval=is_initial_eval,
+        is_best=is_best,
+        eval_result=eval_result,
+    )
+    return append_eval_record_jsonl(record, agents.log_dir)
+
+
 def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -> None:
     train_steps = max(1, configs.running_steps // configs.parallels)
     agents.train(train_steps)
@@ -149,16 +171,15 @@ def test(configs: argparse.Namespace, agents: MAPPO_Agents, envs) -> None:
         phase="test",
         log_prefix="Test-Highway",
     )
-    record = build_eval_record(
+    records_path = append_eval_run_record(
+        agents=agents,
         mode="test",
         phase="test",
         epoch=None,
-        step=agents.current_step,
         is_initial_eval=False,
         is_best=True,
         eval_result=result,
     )
-    records_path = append_eval_record_jsonl(record, agents.log_dir)
     scores = result["scores"]
     print(f"Mean Score: {np.mean(scores)}, Std: {np.std(scores)}")
     print_highway_summary(result["summary"])
@@ -174,6 +195,7 @@ def benchmark(
     configs_test = deepcopy(configs)
     configs_test.parallels = configs_test.test_episode
     test_envs = make_envs(configs_test)
+    write_eval_run_metadata(configs, agents, mode="benchmark")
     try:
         train_steps = max(1, configs.running_steps // configs.parallels)
         eval_interval = max(1, configs.eval_interval // configs.parallels)
@@ -194,6 +216,16 @@ def benchmark(
             "summary": eval_result["summary"],
         }
         print_highway_summary(eval_result["summary"])
+        records_path = append_eval_run_record(
+            agents=agents,
+            mode="benchmark",
+            phase="benchmark",
+            epoch=0,
+            is_initial_eval=True,
+            is_best=True,
+            eval_result=eval_result,
+        )
+        print(f"Eval records saved: {records_path}")
         if save_model:
             agents.save_model(model_name="best_model.pth")
 
@@ -210,9 +242,20 @@ def benchmark(
             test_scores = eval_result["scores"]
             mean_score = np.mean(test_scores)
             print_highway_summary(eval_result["summary"])
-            if is_better_highway_summary(
+            is_best = is_better_highway_summary(
                 eval_result["summary"], best_scores_info["summary"]
-            ):
+            )
+            records_path = append_eval_run_record(
+                agents=agents,
+                mode="benchmark",
+                phase="benchmark",
+                epoch=epoch + 1,
+                is_initial_eval=False,
+                is_best=is_best,
+                eval_result=eval_result,
+            )
+            print(f"Eval records saved: {records_path}")
+            if is_best:
                 best_scores_info = {
                     "mean": mean_score,
                     "std": np.std(test_scores),

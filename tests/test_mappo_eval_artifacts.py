@@ -212,3 +212,47 @@ def test_test_mode_record_uses_null_epoch_and_best_true():
     assert record["step"] == 42
     assert record["is_initial_eval"] is False
     assert record["is_best"] is True
+
+
+def test_benchmark_initial_record_marks_initial_and_best():
+    result = {
+        "scores": [2.0],
+        "summary": {"episodes": 1, "arrival_rate": 0.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    record = build_eval_record(
+        mode="benchmark",
+        phase="benchmark",
+        epoch=0,
+        step=0,
+        is_initial_eval=True,
+        is_best=True,
+        eval_result=result,
+    )
+
+    assert record["epoch"] == 0
+    assert record["is_initial_eval"] is True
+    assert record["is_best"] is True
+
+
+def test_benchmark_epoch_record_marks_non_initial_best_status():
+    result = {
+        "scores": [0.5],
+        "summary": {"episodes": 1, "arrival_rate": 0.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    record = build_eval_record(
+        mode="benchmark",
+        phase="benchmark",
+        epoch=1,
+        step=16,
+        is_initial_eval=False,
+        is_best=False,
+        eval_result=result,
+    )
+
+    assert record["epoch"] == 1
+    assert record["is_initial_eval"] is False
+    assert record["is_best"] is False
