@@ -35,6 +35,11 @@ def test_eval_artifact_paths_require_log_dir():
         eval_artifact_paths("")
 
 
+def test_eval_artifact_paths_require_non_none_log_dir():
+    with pytest.raises(ValueError, match="agents.log_dir"):
+        eval_artifact_paths(None)
+
+
 def test_json_safe_converts_nested_config_values():
     value = {
         "path": Path("models/run"),
@@ -51,6 +56,14 @@ def test_json_safe_converts_nested_config_values():
         "array": [1, 2],
         "tuple": ["a", True],
     }
+
+
+def test_json_safe_recursively_converts_unwrapped_numpy_scalar_values():
+    value = {"date": json_safe(np.datetime64("2026-07-04"))}
+
+    dumped = json.dumps(value)
+
+    assert json.loads(dumped) == {"date": "2026-07-04"}
 
 
 def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):

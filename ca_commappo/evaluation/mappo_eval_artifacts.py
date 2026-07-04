@@ -26,7 +26,7 @@ def json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return value.as_posix()
     if isinstance(value, np.generic):
-        return value.item()
+        return json_safe(value.item())
     if isinstance(value, np.ndarray):
         return json_safe(value.tolist())
     if isinstance(value, dict):
