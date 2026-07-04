@@ -88,6 +88,27 @@ def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):
     assert metadata["config"]["highway_config"] == {"duration": 13}
 
 
+def test_build_eval_metadata_supports_requested_positional_signature(tmp_path):
+    configs = Namespace(
+        env_name="HighwayIntersection",
+        env_id="intersection-multi-agent-v1",
+        seed=2,
+        logger="tensorboard",
+    )
+    agent = FakeAgent(tmp_path / "seed_2_run")
+
+    metadata = build_eval_metadata(
+        configs,
+        agent,
+        "test",
+        "2026-07-04T20:00:00+08:00",
+    )
+
+    assert metadata["created_at"] == "2026-07-04T20:00:00+08:00"
+    assert metadata["mode"] == "test"
+    assert metadata["seed"] == 2
+
+
 def test_write_metadata_and_append_jsonl_records(tmp_path):
     metadata = {"schema_version": 1, "mode": "benchmark", "config": {"seed": 1}}
     metadata_path = write_eval_metadata(metadata, tmp_path)
@@ -136,3 +157,20 @@ def test_build_eval_record_captures_evaluation_result():
         "summary": {"episodes": 1, "arrival_rate": 1.0},
         "episodes": [{"episode_index": 0, "arrival": True}],
     }
+
+
+def test_build_eval_record_supports_requested_positional_signature():
+    result = {
+        "scores": [1.0],
+        "summary": {"episodes": 1, "collision_rate": 0.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    record = build_eval_record("test", "test", None, 42, False, True, result)
+
+    assert record["mode"] == "test"
+    assert record["phase"] == "test"
+    assert record["epoch"] is None
+    assert record["step"] == 42
+    assert record["is_initial_eval"] is False
+    assert record["is_best"] is True

@@ -39,7 +39,6 @@ def json_safe(value: Any) -> Any:
 
 
 def build_eval_metadata(
-    *,
     configs: Namespace,
     agents: Any,
     mode: str,
@@ -73,7 +72,6 @@ def write_eval_metadata(metadata: dict[str, Any], log_dir: str | Path) -> Path:
 
 
 def build_eval_record(
-    *,
     mode: str,
     phase: str,
     epoch: int | None,
