@@ -2,11 +2,11 @@ dl_toolbox: "torch"
 project_name: "CA-ComMAPPO"
 logger: "wandb"
 wandb_user_name: "antaresx403-bupt"
-render: true
+render: false
 render_mode: "rgb_array"
 fps: 15
 test_mode: false
-device: "cuda:0"
+device: "cpu"
 distributed_training: false
 master_port: "12355"
 
@@ -18,7 +18,7 @@ continuous_action: false
 learner: "MAPPO_Learner"
 policy: "Categorical_MAAC_Policy"
 representation: "Basic_MLP"
-vectorize: "DummyVecMultiAgentEnv"
+vectorize: "SubprocVecMultiAgentEnv"
 
 use_rnn: false
 rnn: "GRU"
@@ -40,10 +40,10 @@ use_actions_mask: false
 use_global_state: true
 
 seed: 1
-parallels: 4
-buffer_size: 1024
-n_epochs: 4
-n_minibatch: 4
+parallels: 16
+buffer_size: 2048
+n_epochs: 2
+n_minibatch: 2
 learning_rate: 0.0003
 weight_decay: 0
 
