@@ -46,3 +46,4 @@
 - [xuance 中文文档](https://cn.xuance.org/): 可以参考，但更新不及时
 - [论文计划](./docs/thesis-planning.md): 论文和实验主线规划，仅作全局参考。
 - [Sanity baseline 协议](./docs/sanity_baselines.md): random / idle-only baseline 的命令、指标和复现规则
+- [HighwayEnv FAQ](./docs/highway_env_faq.md): HighwayEnv 常见问题
