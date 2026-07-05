@@ -10,6 +10,18 @@ from xuance.torch.agents import MAPPO_Agents
 from xuance.torch.utils.operations import set_seed
 
 from ca_commappo.envs.highway_intersection_wrapper import DEFAULT_HIGHWAY_ENV_ID
+from ca_commappo.evaluation.highway_metrics import print_highway_summary
+from ca_commappo.evaluation.mappo_highway_metrics import (
+    HighwayMetricsCallback,
+    evaluate_highway_policy,
+    is_better_highway_summary,
+)
+from ca_commappo.evaluation.mappo_eval_artifacts import (
+    append_eval_record_jsonl,
+    build_eval_metadata,
+    build_eval_record,
+    write_eval_metadata,
+)
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
 
@@ -108,6 +120,38 @@ def print_train_information(configs: argparse.Namespace) -> None:
         print(f"{key}: {value}")
 
 
+def write_eval_run_metadata(
+    configs: argparse.Namespace,
+    agents: MAPPO_Agents,
+    mode: str,
+) -> None:
+    metadata = build_eval_metadata(configs=configs, agents=agents, mode=mode)
+    metadata_path = write_eval_metadata(metadata, agents.log_dir)
+    print(f"Eval metadata saved: {metadata_path}")
+
+
+def append_eval_run_record(
+    *,
+    agents: MAPPO_Agents,
+    mode: str,
+    phase: str,
+    epoch: int | None,
+    is_initial_eval: bool,
+    is_best: bool,
+    eval_result: dict[str, Any],
+) -> Path:
+    record = build_eval_record(
+        mode=mode,
+        phase=phase,
+        epoch=epoch,
+        step=agents.current_step,
+        is_initial_eval=is_initial_eval,
+        is_best=is_best,
+        eval_result=eval_result,
+    )
+    return append_eval_record_jsonl(record, agents.log_dir)
+
+
 def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -> None:
     train_steps = max(1, configs.running_steps // configs.parallels)
     agents.train(train_steps)
@@ -119,12 +163,27 @@ def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -
 def test(configs: argparse.Namespace, agents: MAPPO_Agents, envs) -> None:
     model_path = getattr(configs, "model_dir_load", configs.model_dir)
     agents.load_model(path=model_path)
-    scores = agents.test(
+    write_eval_run_metadata(configs, agents, mode="test")
+    result = evaluate_highway_policy(
+        agents=agents,
+        envs=envs,
         test_episodes=configs.test_episode,
-        test_envs=envs,
-        close_envs=False,
+        phase="test",
+        log_prefix="Test-Highway",
     )
+    records_path = append_eval_run_record(
+        agents=agents,
+        mode="test",
+        phase="test",
+        epoch=None,
+        is_initial_eval=False,
+        is_best=True,
+        eval_result=result,
+    )
+    scores = result["scores"]
     print(f"Mean Score: {np.mean(scores)}, Std: {np.std(scores)}")
+    print_highway_summary(result["summary"])
+    print(f"Eval records saved: {records_path}")
     print("Finish testing.")
 
 
@@ -137,37 +196,71 @@ def benchmark(
     configs_test.parallels = configs_test.test_episode
     test_envs = make_envs(configs_test)
     try:
+        write_eval_run_metadata(configs, agents, mode="benchmark")
         train_steps = max(1, configs.running_steps // configs.parallels)
         eval_interval = max(1, configs.eval_interval // configs.parallels)
         num_epoch = max(1, int(train_steps / eval_interval))
 
-        test_scores = agents.test(
+        eval_result = evaluate_highway_policy(
+            agents=agents,
+            envs=test_envs,
             test_episodes=configs.test_episode,
-            test_envs=test_envs,
-            close_envs=False,
+            phase="benchmark",
+            log_prefix="Eval-Highway",
         )
+        test_scores = eval_result["scores"]
         best_scores_info = {
             "mean": np.mean(test_scores),
             "std": np.std(test_scores),
             "step": agents.current_step,
+            "summary": eval_result["summary"],
         }
+        print_highway_summary(eval_result["summary"])
+        records_path = append_eval_run_record(
+            agents=agents,
+            mode="benchmark",
+            phase="benchmark",
+            epoch=0,
+            is_initial_eval=True,
+            is_best=True,
+            eval_result=eval_result,
+        )
+        print(f"Eval records saved: {records_path}")
         if save_model:
             agents.save_model(model_name="best_model.pth")
 
         for epoch in range(num_epoch):
             print(f"Epoch: {epoch + 1}/{num_epoch}:")
             agents.train(eval_interval)
-            test_scores = agents.test(
+            eval_result = evaluate_highway_policy(
+                agents=agents,
+                envs=test_envs,
                 test_episodes=configs.test_episode,
-                test_envs=test_envs,
-                close_envs=False,
+                phase="benchmark",
+                log_prefix="Eval-Highway",
             )
+            test_scores = eval_result["scores"]
             mean_score = np.mean(test_scores)
-            if mean_score > best_scores_info["mean"]:
+            print_highway_summary(eval_result["summary"])
+            is_best = is_better_highway_summary(
+                eval_result["summary"], best_scores_info["summary"]
+            )
+            records_path = append_eval_run_record(
+                agents=agents,
+                mode="benchmark",
+                phase="benchmark",
+                epoch=epoch + 1,
+                is_initial_eval=False,
+                is_best=is_best,
+                eval_result=eval_result,
+            )
+            print(f"Eval records saved: {records_path}")
+            if is_best:
                 best_scores_info = {
                     "mean": mean_score,
                     "std": np.std(test_scores),
                     "step": agents.current_step,
+                    "summary": eval_result["summary"],
                 }
                 if save_model:
                     agents.save_model(model_name="best_model.pth")
@@ -176,6 +269,8 @@ def benchmark(
             "Best Model Score: %.2f, std=%.2f"
             % (best_scores_info["mean"], best_scores_info["std"])
         )
+        print("Best Highway Metrics:")
+        print_highway_summary(best_scores_info["summary"])
     finally:
         test_envs.close()
 
@@ -186,7 +281,9 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
     envs = make_envs(configs)
     agents = None
     try:
-        agents = MAPPO_Agents(config=configs, envs=envs)
+        metrics_callback = HighwayMetricsCallback()
+        agents = MAPPO_Agents(config=configs, envs=envs, callback=metrics_callback)
+        metrics_callback.set_logger(agents.log_infos)
         print_train_information(configs)
         if mode == "benchmark":
             benchmark(configs, agents, save_model=save_model)

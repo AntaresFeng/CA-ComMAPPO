@@ -237,6 +237,7 @@ def test_arrival_rewards_and_termination_match_highway_info():
         assert not truncated
         assert not step_info["global_terminated"]
         assert step_info["agents_terminated"] == (False, True, True)
+        assert step_info["arrived"] == (False, True, True)
         assert terminated == {
             "agent_0": False,
             "agent_1": True,
@@ -253,6 +254,7 @@ def test_arrival_rewards_and_termination_match_highway_info():
         assert not truncated
         assert step_info["global_terminated"]
         assert step_info["agents_terminated"] == (True, True, True)
+        assert step_info["arrived"] == (True, True, True)
         assert terminated == {
             "agent_0": True,
             "agent_1": True,

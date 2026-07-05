@@ -2,10 +2,13 @@ import argparse
 import sys
 from pathlib import Path
 
+from ca_commappo.evaluation.highway_metrics import (
+    format_summary_lines,
+    save_results_json,
+)
 from ca_commappo.evaluation.sanity_baseline_runner import (
     load_sanity_config,
     run_sanity_baseline,
-    save_results_json,
     SUPPORTED_POLICIES,
 )
 
@@ -41,13 +44,8 @@ def print_summary(results: dict) -> None:
     for policy, policy_results in results["policies"].items():
         summary = policy_results["summary"]
         print(f"policy={policy}")
-        print(f"  episodes={summary['episodes']}")
-        print(f"  mean_episode_reward={summary['mean_episode_reward']:.3f}")
-        print(f"  mean_agent_reward={summary['mean_agent_reward']:.3f}")
-        print(f"  mean_episode_length={summary['mean_episode_length']:.3f}")
-        print(f"  collision_rate={summary['collision_rate']:.3f}")
-        print(f"  arrival_rate={summary['arrival_rate']:.3f}")
-        print(f"  truncation_rate={summary['truncation_rate']:.3f}")
+        for line in format_summary_lines(summary, indent="  "):
+            print(line)
 
 
 def main(argv: list[str] | None = None) -> int:
