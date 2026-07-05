@@ -88,7 +88,7 @@ highway_config:
   observation:
     type: "MultiAgentObservation"
     observation_config:
-      absolute: true
+      absolute: false
       vehicles_count: 15
       features: ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"]
   action:
