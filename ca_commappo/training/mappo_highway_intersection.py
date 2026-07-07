@@ -22,6 +22,10 @@ from ca_commappo.evaluation.mappo_eval_artifacts import (
     build_eval_record,
     write_eval_metadata,
 )
+from ca_commappo.evaluation.mappo_video_recorder import (
+    record_mappo_policy_videos,
+    resolve_video_episode_count,
+)
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
 
@@ -58,6 +62,44 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-dir", type=str, default=None)
     parser.add_argument("--model-dir-load", type=str, default=None)
     parser.add_argument(
+        "--record-video",
+        action="store_true",
+        default=None,
+        help="Record representative MAPPO test episodes as MP4 videos.",
+    )
+    parser.add_argument(
+        "--video-episodes",
+        type=str,
+        default=None,
+        help="Number of episodes to record, or 'all'. Defaults to min(test_episode, 6).",
+    )
+    parser.add_argument(
+        "--video-dir",
+        type=str,
+        default=None,
+        help="Directory for recorded MP4s and video summary artifacts.",
+    )
+    parser.add_argument(
+        "--video-seed",
+        type=int,
+        default=None,
+        help="Base seed for video rollout episodes. Defaults to config seed.",
+    )
+    parser.add_argument(
+        "--no-video-contact-sheet",
+        dest="video_contact_sheet",
+        action="store_false",
+        default=None,
+        help="Skip the default contact-sheet JPEG for recorded videos.",
+    )
+    parser.add_argument(
+        "--no-combined-video",
+        dest="video_combined",
+        action="store_false",
+        default=None,
+        help="Skip the default combined MP4 for recorded videos.",
+    )
+    parser.add_argument(
         "--no-save",
         action="store_true",
         help="Skip saving final/best models; useful for very small smoke runs.",
@@ -83,6 +125,7 @@ def load_configs(
     config_dict = load_yaml(file_dir=str(path))
     if overrides:
         config_dict = recursive_dict_update(config_dict, overrides)
+    config_dict["config_path"] = str(path)
     return argparse.Namespace(**config_dict)
 
 
@@ -101,6 +144,12 @@ def cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
         "model_dir": args.model_dir,
         "model_dir_load": args.model_dir_load,
         "test_mode": args.mode == "test",
+        "record_video": args.record_video,
+        "video_episodes": args.video_episodes,
+        "video_dir": args.video_dir,
+        "video_seed": args.video_seed,
+        "video_contact_sheet": args.video_contact_sheet,
+        "video_combined": args.video_combined,
     }
     return {key: value for key, value in candidates.items() if value is not None}
 
@@ -184,6 +233,31 @@ def test(configs: argparse.Namespace, agents: MAPPO_Agents, envs) -> None:
     print(f"Mean Score: {np.mean(scores)}, Std: {np.std(scores)}")
     print_highway_summary(result["summary"])
     print(f"Eval records saved: {records_path}")
+    if getattr(configs, "record_video", False):
+        video_episode_count = resolve_video_episode_count(
+            test_episode=configs.test_episode,
+            requested=getattr(configs, "video_episodes", None),
+        )
+        video_dir = (
+            getattr(configs, "video_dir", None) or Path(agents.log_dir) / "videos"
+        )
+        video_seed = getattr(configs, "video_seed", None)
+        video_result = record_mappo_policy_videos(
+            configs=configs,
+            agents=agents,
+            model_path=str(model_path),
+            video_dir=video_dir,
+            episode_count=video_episode_count,
+            base_seed=configs.seed if video_seed is None else video_seed,
+            make_contact_sheet=getattr(configs, "video_contact_sheet", True),
+            make_combined_video=getattr(configs, "video_combined", True),
+        )
+        print(f"Video eval summary saved: {video_result['summary_path']}")
+        print(f"Video files saved: {video_result['video_dir']}")
+        if video_result.get("combined_video_path"):
+            print(f"Combined video saved: {video_result['combined_video_path']}")
+        if video_result.get("contact_sheet_path"):
+            print(f"Contact sheet saved: {video_result['contact_sheet_path']}")
     print("Finish testing.")
 
 
@@ -300,6 +374,8 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.record_video and args.mode != "test":
+        parser.error("--record-video is only supported with --mode test")
     configs = load_configs(args.env_id, cli_overrides(args), config_path=args.config)
     run(configs, mode=args.mode, save_model=not args.no_save)
     return 0

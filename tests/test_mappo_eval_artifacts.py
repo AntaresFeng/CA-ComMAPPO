@@ -23,6 +23,9 @@ class FakeAgent:
         self.log_dir = str(log_dir)
         self.current_step = 42
 
+    def load_model(self, path):
+        self.loaded_model_path = path
+
 
 class FakeBenchmarkAgent:
     def __init__(self, log_dir: Path):
@@ -361,3 +364,103 @@ def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypat
         mappo_training.benchmark(configs, agent, save_model=False)
 
     assert fake_env.closed is True
+
+
+def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
+    configs = Namespace(
+        env_name="HighwayIntersection",
+        env_id="intersection-multi-agent-v1",
+        seed=3,
+        logger="tensorboard",
+        test_episode=8,
+        model_dir="models/default",
+        model_dir_load="models/best_model.pth",
+        record_video=True,
+        video_episodes=None,
+        video_dir=str(tmp_path / "videos"),
+        video_seed=0,
+        video_contact_sheet=True,
+        video_combined=True,
+    )
+    agent = FakeAgent(tmp_path / "test_run")
+    calls = []
+    result = {
+        "scores": [1.0],
+        "summary": {"episodes": 1, "arrival_rate": 1.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    monkeypatch.setattr(
+        mappo_training, "evaluate_highway_policy", lambda **_kwargs: result
+    )
+    monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
+    monkeypatch.setattr(
+        mappo_training,
+        "record_mappo_policy_videos",
+        lambda **kwargs: (
+            calls.append(kwargs)
+            or {
+                "summary_path": str(tmp_path / "videos" / "video_eval_summary.json"),
+                "video_dir": str(tmp_path / "videos"),
+                "combined_video_path": None,
+                "contact_sheet_path": None,
+            }
+        ),
+    )
+
+    mappo_training.test(configs, agent, envs=object())
+
+    assert calls
+    assert calls[0]["model_path"] == "models/best_model.pth"
+    assert calls[0]["episode_count"] == 6
+    assert calls[0]["base_seed"] == 0
+    assert calls[0]["make_contact_sheet"] is True
+    assert calls[0]["make_combined_video"] is True
+
+
+def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
+    configs = Namespace(
+        env_name="HighwayIntersection",
+        env_id="intersection-multi-agent-v1",
+        seed=3,
+        logger="tensorboard",
+        test_episode=1,
+        model_dir="models/default",
+        record_video=False,
+    )
+    agent = FakeAgent(tmp_path / "test_run")
+    result = {
+        "scores": [1.0],
+        "summary": {"episodes": 1, "arrival_rate": 1.0},
+        "episodes": [{"episode_index": 0}],
+    }
+
+    monkeypatch.setattr(
+        mappo_training, "evaluate_highway_policy", lambda **_kwargs: result
+    )
+    monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
+    monkeypatch.setattr(
+        mappo_training,
+        "record_mappo_policy_videos",
+        lambda **_kwargs: pytest.fail("video recorder should not be called"),
+    )
+
+    mappo_training.test(configs, agent, envs=object())
+
+
+def test_load_configs_stores_config_path(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        mappo_training,
+        "load_yaml",
+        lambda file_dir: {
+            "env_name": "HighwayIntersection",
+            "env_id": "intersection-multi-agent-v1",
+        },
+    )
+
+    configs = mappo_training.load_configs(config_path=str(config_path))
+
+    assert configs.config_path == str(config_path)
