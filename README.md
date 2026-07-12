@@ -52,10 +52,29 @@ uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-s
 
 ## MAPPO Video Evaluation
 
+Each MAPPO command creates an isolated run directory under `runs/mappo_highway/`
+by default. The resolved layout is:
+
+```text
+runs/mappo_highway/<timestamp>_<mode>_seed_<seed>/
+|-- eval_metadata.json       # test/benchmark only
+|-- eval_records.jsonl       # test/benchmark only
+|-- wandb/                   # local W&B run files
+|-- models/
+|   |-- final_train_model.pth  # train
+|   `-- best_model.pth         # benchmark
+`-- videos/                  # test --record-video
+```
+
+Use `--output-dir` only when the run root itself needs to be redirected. The
+per-run folder, log directory, model directory, and default video directory are
+always derived automatically. The same run ID is also used as the W&B display
+name and stored in the W&B config.
+
 Record representative videos while testing a trained MAPPO checkpoint:
 
 ```powershell
-uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --mode test --model-dir-load models/mappo_highway/<run>/seed_<seed_timestamp>/best_model.pth --test-episode 32 --record-video
+uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --mode test --model-dir-load runs/mappo_highway/<benchmark_run>/models/best_model.pth --test-episode 32 --record-video
 ```
 
 By default this records `min(test_episode, 6)` representative episodes under the run log directory's `videos/` folder and writes `video_eval_summary.json`, individual MP4s, a contact sheet, and a combined MP4.

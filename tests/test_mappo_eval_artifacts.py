@@ -165,6 +165,13 @@ def test_write_metadata_and_append_jsonl_records(tmp_path):
     assert [json.loads(line) for line in lines] == [first_record, second_record]
 
 
+def test_write_metadata_refuses_to_overwrite_existing_run(tmp_path):
+    write_eval_metadata({"mode": "test"}, tmp_path)
+
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        write_eval_metadata({"mode": "benchmark"}, tmp_path)
+
+
 def test_build_eval_record_captures_evaluation_result():
     result = {
         "scores": [2.0],

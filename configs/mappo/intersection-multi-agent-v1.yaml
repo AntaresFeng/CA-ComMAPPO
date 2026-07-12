@@ -72,8 +72,7 @@ running_steps: 10000000
 eval_interval: 10000
 test_episode: 5
 
-log_dir: "logs/mappo_highway/"
-model_dir: "models/mappo_highway/"
+output_dir: "runs/mappo_highway/"
 
 highway_config:
   controlled_vehicles: 2

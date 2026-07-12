@@ -64,10 +64,14 @@ def build_eval_metadata(
 def write_eval_metadata(metadata: dict[str, Any], log_dir: str | Path) -> Path:
     metadata_path, _records_path = eval_artifact_paths(log_dir)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path.write_text(
-        json.dumps(json_safe(metadata), indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
+    try:
+        with metadata_path.open("x", encoding="utf-8") as output:
+            output.write(json.dumps(json_safe(metadata), indent=2, sort_keys=True))
+            output.write("\n")
+    except FileExistsError as error:
+        raise FileExistsError(
+            f"Refusing to overwrite existing eval metadata: {metadata_path}"
+        ) from error
     return metadata_path
 
 

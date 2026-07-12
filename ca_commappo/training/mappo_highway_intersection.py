@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import wandb
 from xuance.common import load_yaml, recursive_dict_update
 from xuance.environment import make_envs
 from xuance.torch.agents import MAPPO_Agents
@@ -25,6 +26,10 @@ from ca_commappo.evaluation.mappo_eval_artifacts import (
 from ca_commappo.evaluation.mappo_video_recorder import (
     record_mappo_policy_videos,
     resolve_video_episode_count,
+)
+from ca_commappo.training.mappo_run_layout import (
+    align_wandb_run_name,
+    prepare_run_directory,
 )
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
@@ -58,8 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--n-minibatch", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--log-dir", type=str, default=None)
-    parser.add_argument("--model-dir", type=str, default=None)
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Root directory for isolated run folders, logs, models, eval JSON, and videos.",
+    )
     parser.add_argument("--model-dir-load", type=str, default=None)
     parser.add_argument(
         "--record-video",
@@ -140,8 +149,7 @@ def cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
         "n_minibatch": args.n_minibatch,
         "seed": args.seed,
         "device": args.device,
-        "log_dir": args.log_dir,
-        "model_dir": args.model_dir,
+        "output_dir": args.output_dir,
         "model_dir_load": args.model_dir_load,
         "test_mode": args.mode == "test",
         "record_video": args.record_video,
@@ -164,6 +172,8 @@ def print_train_information(configs: argparse.Namespace) -> None:
         "Vectorizer": configs.vectorize,
         "Parallels": configs.parallels,
         "Running steps": configs.running_steps,
+        "Run directory": configs.run_dir,
+        "Model directory": configs.model_dir,
     }
     for key, value in train_information.items():
         print(f"{key}: {value}")
@@ -205,7 +215,7 @@ def train(configs: argparse.Namespace, agents: MAPPO_Agents, save_model: bool) -
     train_steps = max(1, configs.running_steps // configs.parallels)
     agents.train(train_steps)
     if save_model:
-        agents.save_model("final_train_model.pth")
+        agents.save_model("final_train_model.pth", model_path=configs.model_dir)
     print("Finish training.")
 
 
@@ -301,7 +311,7 @@ def benchmark(
         )
         print(f"Eval records saved: {records_path}")
         if save_model:
-            agents.save_model(model_name="best_model.pth")
+            agents.save_model(model_name="best_model.pth", model_path=configs.model_dir)
 
         for epoch in range(num_epoch):
             print(f"Epoch: {epoch + 1}/{num_epoch}:")
@@ -337,7 +347,9 @@ def benchmark(
                     "summary": eval_result["summary"],
                 }
                 if save_model:
-                    agents.save_model(model_name="best_model.pth")
+                    agents.save_model(
+                        model_name="best_model.pth", model_path=configs.model_dir
+                    )
 
         print(
             "Best Model Score: %.2f, std=%.2f"
@@ -350,6 +362,7 @@ def benchmark(
 
 
 def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None:
+    prepare_run_directory(configs, mode)
     patch_xuance_marl_buffer_aliases()
     set_seed(configs.seed)
     envs = make_envs(configs)
@@ -357,6 +370,7 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
     try:
         metrics_callback = HighwayMetricsCallback()
         agents = MAPPO_Agents(config=configs, envs=envs, callback=metrics_callback)
+        align_wandb_run_name(configs, wandb.run)
         metrics_callback.set_logger(agents.log_infos)
         print_train_information(configs)
         if mode == "benchmark":
