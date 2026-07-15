@@ -42,16 +42,17 @@
 
 ## 2. 各脚本作用详解
 
-### 2.1 `ca_commappo/envs/highway_intersection.py` — 环境适配器
+### 2.1 `ca_commappo/envs/highway_intersection_wrapper.py` — 环境适配器
 
 默认将 highway-env 的 `intersection-multi-agent-v1` 包装为 XuanCe `RawMultiAgentEnv`；显式传入 `intersection-v1` 时仍保留兼容路径，但主线配置不再使用它。
 
-- **`HighwayIntersectionMultiAgentEnv`**（L63-249）
-  - 读 `env_config`（duck-typed Namespace）的 `env_id` / `render_mode` / `flatten_observations` / `highway_config`。
+- **`HighwayIntersectionMultiAgentEnv`**
+  - 读 `env_config`（duck-typed Namespace）的 `env_id` / `render_mode` / `flatten_observations` / `global_npc_capacity` / `highway_config`；`global_npc_capacity` 是 wrapper 顶层配置，不会传入 highway-env。
   - `build_intersection_config()` 组装嵌套 config → `gym.make()` 造底层 env。
   - `controlled_vehicles` 决定 agent 数，命名 `agent_0..agent_{n-1}`，单组 CTDE。
-  - **step**：调底层 step → 取 per-agent reward → `_mask_rewards` 对 inactive 置 0 → 返回的 `rewards` 和 `info["agents_rewards"]` 都使用 masked adapter-facing reward → 原始 highway reward 放 `info["raw_agents_rewards"]` → `terminated` 取 per-agent terminated → `info["global_terminated"]` 表示环境级结束 → `info["crashed"]` / `info["arrived"]` 暴露 per-agent episode facts → `truncated` 透传标量 → 更新 `_active_agents` 状态机。
-  - `state()`（L225-230）= 各 agent obs 拼接（**不是真正全局状态，不含非受控车**）。
+  - **step**：调底层 step → 在 highway-env 完成 NPC 删除/生成后重新调用 observation type → 取 per-agent reward → `_mask_rewards` 对 inactive 置 0 → 返回的 `rewards` 和 `info["agents_rewards"]` 都使用 masked adapter-facing reward → 原始 highway reward 放 `info["raw_agents_rewards"]` → `terminated` 取 per-agent terminated → `info["global_terminated"]` 表示环境级结束 → `info["crashed"]` / `info["arrived"]` 暴露 per-agent episode facts → `truncated` 透传标量 → 更新 `_active_agents` 状态机。重观察保证 actor 局部 observation 与 critic 全局 state 使用同一个 post-step 车辆快照。
+  - **`global_observation()`**：返回 `controlled[N,7]`、`npc[K,7]`、`npc_mask[K]`。受控车固定 agent 顺序且终止后清零；NPC 每次从当前 `road.vehicles` 重建，按距 `(0,0)` 的距离及运动学字段确定性排序，截断并补零。
+  - **`state()`**：按 `controlled.flatten() + npc.flatten() + npc_mask` 输出 XuanCe `Basic_MLP` 所需的一维全局状态。K 可由顶层 `global_npc_capacity` 指定，缺省时由初始 NPC 上界和单局最大 spawn step 数推导。
   - `IDLE_ACTION = 1`（L13）硬编码，假设 highway 动作表 `{0:SLOWER,1:IDLE,2:FASTER}`。
 - **`build_intersection_config()`**（L47-60）：合并默认 config + 用户 override，校验 `controlled_vehicles > 0`。
 - **`register_highway_intersection_env()`**：注册到 XuanCe `REGISTRY_MULTI_AGENT_ENV`，键默认 `"HighwayIntersection"`；模块导入时会自动注册默认键。

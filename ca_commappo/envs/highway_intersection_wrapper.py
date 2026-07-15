@@ -1,10 +1,12 @@
 from copy import deepcopy
+from math import ceil
 from typing import Any
 
 import gymnasium as gym
 import highway_env  # noqa: F401 - importing registers highway-env ids.
 import numpy as np
 from gymnasium import spaces
+from highway_env import utils
 from highway_env.envs.intersection_env import IntersectionEnv, MultiAgentIntersectionEnv
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
@@ -12,6 +14,8 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 DEFAULT_ENV_NAME = "HighwayIntersection"
 DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
+GLOBAL_OBSERVATION_FEATURES = ("presence", "x", "y", "vx", "vy", "cos_h", "sin_h")
+INTERSECTION_CENTER = np.zeros(2, dtype=np.float32) # (0.0, 0.0)
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -75,6 +79,9 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
         self.config = build_intersection_config(highway_config)
         self.num_agents = int(self.config["controlled_vehicles"])
+        self.global_npc_capacity = self._resolve_global_npc_capacity(
+            getattr(env_config, "global_npc_capacity", None)
+        )
         self.agents = [f"agent_{i}" for i in range(self.num_agents)]
         self.agent_groups = [self.agents]
         self.env = gym.make(
@@ -89,10 +96,19 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         }
         self.state_space = self._build_state_space()
         self.max_episode_steps = self._max_episode_steps()
-        self._last_obs: dict[str, np.ndarray] | None = None
         self._initial_seed = getattr(env_config, "env_seed", None)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        self._scene_ready = False
+
+        observation_config = self.config["observation"]["observation_config"]
+        self._global_observation_normalize = bool(
+            observation_config.get("normalize", True)
+        )
+        self._global_observation_clip = bool(observation_config.get("clip", True))
+        self._global_observation_feature_ranges = deepcopy(
+            observation_config.get("features_range", {})
+        )
 
     def _validate_multi_agent_spaces(self) -> None:
         if not isinstance(self.env.observation_space, spaces.Tuple):
@@ -113,10 +129,32 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             raise ValueError("action_space length does not match controlled_vehicles")
 
     def _build_state_space(self) -> spaces.Box:
-        flat_dim = sum(
-            int(np.prod(space.shape)) for space in self.observation_space.values()
+        feature_count = len(GLOBAL_OBSERVATION_FEATURES)
+        flat_dim = (
+            self.num_agents * feature_count
+            + self.global_npc_capacity * feature_count
+            + self.global_npc_capacity
         )
         return spaces.Box(-np.inf, np.inf, shape=(flat_dim,), dtype=np.float32)
+
+    def _resolve_global_npc_capacity(self, configured_capacity: Any) -> int:
+        if configured_capacity is not None:
+            if (
+                isinstance(configured_capacity, bool)
+                or not isinstance(configured_capacity, (int, np.integer))
+                or int(configured_capacity) <= 0
+            ):
+                raise ValueError("global_npc_capacity must be a positive integer")
+            return int(configured_capacity)
+
+        initial_npc_bound = max(1, int(self.config["initial_vehicle_count"]))
+        step_spawn_bound = max(
+            1,
+            ceil(
+                float(self.config["duration"]) * float(self.config["policy_frequency"])
+            ),
+        )
+        return initial_npc_bound + step_spawn_bound
 
     def _build_observation_space(self) -> dict[str, spaces.Space]:
         observation_space = {}
@@ -185,10 +223,89 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             for agent in self.agents
         }
 
-    def _remember_obs(self, obs: dict[str, Any]) -> None:
-        self._last_obs = {
-            agent: np.asarray(value, dtype=np.float32) for agent, value in obs.items()
+    def _empty_global_observation(self) -> dict[str, np.ndarray]:
+        feature_count = len(GLOBAL_OBSERVATION_FEATURES)
+        return {
+            "controlled": np.zeros((self.num_agents, feature_count), dtype=np.float32),
+            "npc": np.zeros(
+                (self.global_npc_capacity, feature_count), dtype=np.float32
+            ),
+            "npc_mask": np.zeros(self.global_npc_capacity, dtype=np.float32),
         }
+
+    def _vehicle_feature_values(self, vehicle) -> tuple[dict[str, float], np.ndarray]:
+        record = vehicle.to_dict(
+            origin_vehicle=None,
+            observe_intentions=False,
+        )
+        features = []
+        for feature in GLOBAL_OBSERVATION_FEATURES:
+            value = float(record[feature])
+            if self._global_observation_normalize and feature in (
+                self._global_observation_feature_ranges
+            ):
+                value = float(
+                    utils.lmap(
+                        value,
+                        self._global_observation_feature_ranges[feature],
+                        [-1, 1],
+                    )
+                )
+                if self._global_observation_clip:
+                    value = float(np.clip(value, -1, 1))
+            features.append(value)
+        return record, np.asarray(features, dtype=np.float32)
+
+    @staticmethod
+    def _npc_sort_key(record: dict[str, float]) -> tuple[float, ...]:
+        position = np.asarray([record["x"], record["y"]], dtype=np.float64)
+        relative_position = position - INTERSECTION_CENTER
+        distance_squared = float(np.dot(relative_position, relative_position))
+        return (
+            distance_squared,
+            float(record["x"]),
+            float(record["y"]),
+            float(record["vx"]),
+            float(record["vy"]),
+            float(record["cos_h"]),
+            float(record["sin_h"]),
+        )
+
+    def global_observation(self) -> dict[str, np.ndarray]:
+        """Return the current centralized scene observation.
+
+        Controlled vehicles use fixed agent-aligned rows. NPC rows are rebuilt
+        from the current scene and deterministically sorted by distance to the
+        intersection center before truncation and zero-padding.
+        """
+        global_obs = self._empty_global_observation()
+        base_env = self.env.unwrapped
+        if not self._scene_ready or base_env.road is None:
+            return global_obs
+
+        controlled_vehicles = list(base_env.controlled_vehicles)
+        for index, (agent, vehicle) in enumerate(
+            zip(self.agents, controlled_vehicles, strict=True)
+        ):
+            if self._active_agents[agent]:
+                _record, features = self._vehicle_feature_values(vehicle)
+                global_obs["controlled"][index] = features
+
+        controlled_vehicle_ids = {id(vehicle) for vehicle in controlled_vehicles}
+        npc_records = []
+        for vehicle in base_env.road.vehicles:
+            if id(vehicle) in controlled_vehicle_ids:
+                continue
+            record, features = self._vehicle_feature_values(vehicle)
+            npc_records.append((self._npc_sort_key(record), features))
+
+        npc_records.sort(key=lambda item: item[0])
+        for index, (_sort_key, features) in enumerate(
+            npc_records[: self.global_npc_capacity]
+        ):
+            global_obs["npc"][index] = features
+            global_obs["npc_mask"][index] = 1.0
+        return global_obs
 
     def reset(self, **kwargs):
         if "seed" not in kwargs and self._initial_seed is not None:
@@ -197,7 +314,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
-        self._remember_obs(obs_dict)
+        self._scene_ready = True
         return obs_dict, {}
 
     def step(self, action_dict: dict[str, Any]):
@@ -205,7 +322,11 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         action_tuple = self._actions_to_tuple(action_dict, active_before_step)
         # intersection-multi-agent-v1's MultiAgentWrapper returns per-agent
         # tuples for reward and terminated directly from step().
-        observation, reward, terminated, truncated, info = self.env.step(action_tuple)
+        _observation, reward, terminated, truncated, info = self.env.step(action_tuple)
+        # IntersectionEnv creates and removes NPCs after AbstractEnv has built
+        # its observation. Re-observe here so actor observations and the
+        # centralized state describe the same post-step vehicle snapshot.
+        observation = self.env.unwrapped.observation_type.observe()
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         raw_rewards = self._tuple_to_agent_dict(reward)
         rewards = self._mask_rewards(raw_rewards, active_before_step)
@@ -237,15 +358,17 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             agent: active_before_step[agent] and not bool(terminated[agent])
             for agent in self.agents
         }
-        self._remember_obs(obs_dict)
         return obs_dict, rewards, terminated, bool(truncated), info
 
     def state(self):
-        if self._last_obs is None:
-            return np.zeros(self.state_space.shape, dtype=np.float32)
+        global_obs = self.global_observation()
         return np.concatenate(
-            [self._last_obs[agent].reshape(-1) for agent in self.agents]
-        ).astype(np.float32)
+            [
+                global_obs["controlled"].reshape(-1),
+                global_obs["npc"].reshape(-1),
+                global_obs["npc_mask"],
+            ]
+        ).astype(np.float32, copy=False)
 
     def agent_mask(self):
         return dict(self._last_agent_mask)
