@@ -27,6 +27,7 @@ from ca_commappo.evaluation.mappo_video_recorder import (
     record_mappo_policy_videos,
     resolve_video_episode_count,
 )
+from ca_commappo.networks.attention_mappo import resolve_mappo_agent_class
 from ca_commappo.training.mappo_run_layout import (
     align_wandb_run_name,
     prepare_run_directory,
@@ -369,7 +370,8 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
     agents = None
     try:
         metrics_callback = HighwayMetricsCallback()
-        agents = MAPPO_Agents(config=configs, envs=envs, callback=metrics_callback)
+        agent_class = resolve_mappo_agent_class(configs.representation)
+        agents = agent_class(config=configs, envs=envs, callback=metrics_callback)
         align_wandb_run_name(configs, wandb.run)
         metrics_callback.set_logger(agents.log_infos)
         print_train_information(configs)

@@ -1,0 +1,93 @@
+dl_toolbox: "torch"
+project_name: "CA-ComMAPPO"
+logger: "wandb"
+wandb_user_name: "antaresx403-bupt"
+render: false
+render_mode: "rgb_array"
+fps: 15
+device: "cpu"
+distributed_training: false
+
+agent: "MAPPO"
+env_name: "HighwayIntersection"
+env_id: "intersection-multi-agent-v1"
+env_seed: 1
+vectorize: "DummyVecMultiAgentEnv"
+
+learner: "MAPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "VehicleAttention"
+use_rnn: false
+use_parameter_sharing: true
+use_actions_mask: false
+use_global_state: true
+
+flatten_observations: true
+attention:
+  actor:
+    embed_dim: 64
+    num_heads: 4
+    num_layers: 2
+    ffn_dim: 128
+    dropout: 0.0
+    activation: "gelu"
+  critic:
+    embed_dim: 64
+    num_heads: 4
+    num_layers: 2
+    ffn_dim: 128
+    dropout: 0.0
+    activation: "gelu"
+actor_hidden_size: [64, 64]
+critic_hidden_size: [64, 64]
+activation: "relu"
+normalize: "LayerNorm"
+
+seed: 1
+parallels: 1
+buffer_size: 8
+n_epochs: 1
+n_minibatch: 1
+learning_rate: 0.0003
+weight_decay: 0
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+vf_coef: 0.5
+ent_coef: 0.01
+
+use_linear_lr_decay: false
+end_factor_lr_decay: 0.5
+use_value_clip: true
+value_clip_range: 0.2
+use_value_norm: true
+use_huber_loss: true
+huber_delta: 10.0
+use_advnorm: true
+use_gae: true
+use_grad_clip: true
+grad_clip_norm: 10.0
+
+running_steps: 16
+eval_interval: 16
+test_episode: 1
+
+output_dir: "runs/mappo_highway/"
+
+highway_config:
+  controlled_vehicles: 3
+  duration: 13
+  initial_vehicle_count: 10
+  spawn_probability: 0.6
+  collision_reward: -5
+  high_speed_reward: 1
+  arrived_reward: 1
+  normalize_reward: false
+  observation:
+    observation_config:
+      absolute: false
+      vehicles_count: 15
+      features: ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"]
+  action:
+    action_config:
+      target_speeds: [0, 4.5, 9]

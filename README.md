@@ -56,6 +56,21 @@ XuanCe 的 `state()` 将上述三段按 `controlled.flatten() + npc.flatten() + 
 
 highway-env 1.11 会在生成原始 step observation 后才删除和生成 NPC；适配器因此会在底层 step 完成后重新观察，使返回给 actor 的局部 observation 与 centralized state 基于同一 post-step 场景快照。这项 state 维度和 observation 时序变更不兼容旧 MAPPO checkpoint，旧模型应使用旧代码评估，新实验需要重新训练。
 
+## Vehicle Attention MAPPO
+
+项目同时提供 MLP baseline 和车辆 token attention 两组 MAPPO 配置。Attention actor 只读取每个 agent 自己的 `15×7` ego-relative Kinematics observation，以第 0 行 ego token 读取局部车辆集合；attention critic 读取 centralized state，以 XuanCe one-hot agent ID 对应的 controlled token 读取 `N+K` 个全局车辆 token。两侧均使用 presence/mask 排除 padding，NPC 不使用槽位或距离排名 embedding，因此动态 NPC 槽位不会被当作固定身份。
+
+Attention 实现位于项目包内，不修改 XuanCe 安装目录、buffer 或 learner。`VehicleAttention` 要求 `use_parameter_sharing: true`、`use_global_state: true`、`use_rnn: false`、`flatten_observations: true`、离散动作和固定七维特征顺序。Actor/critic 分别通过 `attention.actor` 和 `attention.critic` 配置 `embed_dim`、`num_heads`、`num_layers`、`ffn_dim`、`dropout`、`activation`；本次不导出 attention 权重。
+
+运行 attention smoke：
+
+```powershell
+$env:WANDB_MODE='offline'
+uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-attention-smoke.yaml --mode train --no-save
+```
+
+正式 attention 配置为 `configs/mappo/intersection-multi-agent-v1-attention.yaml`。原 `intersection-multi-agent-v1.yaml` 和 `intersection-multi-agent-v1-smoke.yaml` 继续使用 `Basic_MLP`，用于 baseline/ablation。MLP 与 attention checkpoint 不互相兼容；attention 加载会严格检查 N、K、特征顺序和网络 shape。
+
 ## MAPPO Video Evaluation
 
 Each MAPPO command creates an isolated run directory under `runs/mappo_highway/`

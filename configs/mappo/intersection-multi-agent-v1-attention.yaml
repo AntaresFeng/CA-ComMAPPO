@@ -1,0 +1,110 @@
+dl_toolbox: "torch"
+project_name: "CA-ComMAPPO"
+logger: "wandb"
+wandb_user_name: "antaresx403-bupt"
+render: false
+render_mode: "rgb_array"
+fps: 15
+test_mode: false
+device: "cuda"
+distributed_training: false
+master_port: "12355"
+
+agent: "MAPPO"
+env_name: "HighwayIntersection"
+env_id: "intersection-multi-agent-v1"
+env_seed: 1
+continuous_action: false
+learner: "MAPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "VehicleAttention"
+vectorize: "SubprocVecMultiAgentEnv"
+
+use_rnn: false
+rnn: "GRU"
+fc_hidden_sizes: [64, 64, 64]
+recurrent_hidden_size: 64
+N_recurrent_layers: 1
+dropout: 0
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+flatten_observations: true
+attention:
+  actor:
+    embed_dim: 128
+    num_heads: 4
+    num_layers: 2
+    ffn_dim: 256
+    dropout: 0.0
+    activation: "gelu"
+  critic:
+    embed_dim: 128
+    num_heads: 4
+    num_layers: 2
+    ffn_dim: 256
+    dropout: 0.0
+    activation: "gelu"
+actor_hidden_size: [128, 128]
+critic_hidden_size: [128, 128]
+activation: "relu"
+use_parameter_sharing: true
+use_actions_mask: false
+use_global_state: true
+
+seed: 1
+parallels: 16
+buffer_size: 2048
+n_epochs: 2
+n_minibatch: 2
+learning_rate: 0.0003
+weight_decay: 0
+
+vf_coef: 0.5
+ent_coef: 0.01
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
+
+# tricks
+use_linear_lr_decay: false
+end_factor_lr_decay: 0.5
+use_value_clip: true
+value_clip_range: 0.2
+use_value_norm: true
+use_huber_loss: true
+huber_delta: 10.0
+use_advnorm: true
+use_gae: true
+gae_lambda: 0.95
+use_grad_clip: true
+grad_clip_norm: 10.0
+
+running_steps: 10000000
+eval_interval: 10000
+test_episode: 5
+
+output_dir: "runs/mappo_highway/"
+
+highway_config:
+  controlled_vehicles: 2
+  duration: 20
+  initial_vehicle_count: 10
+  spawn_probability: 0.6
+  collision_reward: -10
+  high_speed_reward: 0.5
+  reward_speed_range: [5.0, 9.0]
+  arrived_reward: 5
+  normalize_reward: false
+  observation:
+    type: "MultiAgentObservation"
+    observation_config:
+      absolute: false
+      vehicles_count: 15
+      features: ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"]
+  action:
+    type: "MultiAgentAction"
+    action_config:
+      target_speeds: [0, 4.5, 9]

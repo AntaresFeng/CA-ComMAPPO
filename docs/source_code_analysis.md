@@ -28,6 +28,7 @@
 | `ca_commappo/envs/highway_intersection.py` | 254 | **核心：highway-env → XuanCe 适配器** |
 | `ca_commappo/evaluation/__init__.py` | 1 | 包标记 |
 | `ca_commappo/xuance_compat.py` | 27 | **XuanCe 版本兼容 shim** |
+| `ca_commappo/networks/attention_mappo.py` | 动态 | **车辆 token attention representation、policy 适配与 MAPPO agent** |
 | `ca_commappo/evaluation/sanity_baseline_runner.py` | 199 | **sanity baseline 执行器** |
 | `main.py` | 34 | 顶层薄 dispatcher |
 | `ca_commappo/cli/run_sanity_baseline.py` | 68 | 兜底策略评估执行器 |
@@ -52,7 +53,7 @@
   - `controlled_vehicles` 决定 agent 数，命名 `agent_0..agent_{n-1}`，单组 CTDE。
   - **step**：调底层 step → 在 highway-env 完成 NPC 删除/生成后重新调用 observation type → 取 per-agent reward → `_mask_rewards` 对 inactive 置 0 → 返回的 `rewards` 和 `info["agents_rewards"]` 都使用 masked adapter-facing reward → 原始 highway reward 放 `info["raw_agents_rewards"]` → `terminated` 取 per-agent terminated → `info["global_terminated"]` 表示环境级结束 → `info["crashed"]` / `info["arrived"]` 暴露 per-agent episode facts → `truncated` 透传标量 → 更新 `_active_agents` 状态机。重观察保证 actor 局部 observation 与 critic 全局 state 使用同一个 post-step 车辆快照。
   - **`global_observation()`**：返回 `controlled[N,7]`、`npc[K,7]`、`npc_mask[K]`。受控车固定 agent 顺序且终止后清零；NPC 每次从当前 `road.vehicles` 重建，按距 `(0,0)` 的距离及运动学字段确定性排序，截断并补零。
-  - **`state()`**：按 `controlled.flatten() + npc.flatten() + npc_mask` 输出 XuanCe `Basic_MLP` 所需的一维全局状态。K 可由顶层 `global_npc_capacity` 指定，缺省时由初始 NPC 上界和单局最大 spawn step 数推导。
+  - **`state()`**：按 `controlled.flatten() + npc.flatten() + npc_mask` 输出一维全局状态，供 MLP baseline 或 VehicleAttention critic 解析。K 可由顶层 `global_npc_capacity` 指定，缺省时由初始 NPC 上界和单局最大 spawn step 数推导。
   - `IDLE_ACTION = 1`（L13）硬编码，假设 highway 动作表 `{0:SLOWER,1:IDLE,2:FASTER}`。
 - **`build_intersection_config()`**（L47-60）：合并默认 config + 用户 override，校验 `controlled_vehicles > 0`。
 - **`register_highway_intersection_env()`**：注册到 XuanCe `REGISTRY_MULTI_AGENT_ENV`，键默认 `"HighwayIntersection"`；模块导入时会自动注册默认键。
@@ -96,7 +97,10 @@
 
 ### 2.8 `ca_commappo/training/mappo_highway_intersection.py` — 唯一的 MAPPO 训练入口
 
-- **`run()`**：调用 `patch_xuance_marl_buffer_aliases()`（来自 `ca_commappo.xuance_compat`）→ `make_envs` → `MAPPO_Agents` → 模式分支。环境注册由 adapter 模块导入时自动完成。
+- **`run()`**：调用 `patch_xuance_marl_buffer_aliases()`（来自 `ca_commappo.xuance_compat`）→ `make_envs` → 根据 `representation` 选择原生 `MAPPO_Agents` 或项目内 `AttentionMAPPOAgents` → 模式分支。环境注册由 adapter 模块导入时自动完成。
+- **VehicleAttention**：actor 将扁平局部观察恢复为车辆 token，以 ego token 输出策略表征；critic 解析 centralized state，通过 agent ID 选择对应 controlled token 的 self-attention 输出。两者复用 XuanCe categorical actor/critic heads、learner 和 buffer。
+- **Mask 与身份**：actor 用 `presence` mask，critic 用 controlled presence 与显式 `npc_mask`；controlled 使用固定 agent-slot embedding，NPC 只使用共享 type embedding，不给动态 NPC 槽位编码永久身份。
+- **配置选择**：原正式/smoke YAML 保留 `Basic_MLP`；新增 `*-attention.yaml` 和 `*-attention-smoke.yaml`，attention actor/critic 超参数分别配置，不新增 CLI 参数。
 - **`train()`**（L139-144）：只调 `agents.train()` + 可选 `save_model("final_train_model.pth")`，**不评估**。
 - **`benchmark()`**：周期性 `agents.test()`，但**只用 episode reward mean/std 选 best model，不计算 collision/arrival/episode length 等任务指标**。
 - **`test()`**（L147-156）：加载模型，只打印 `Mean Score / Std`。

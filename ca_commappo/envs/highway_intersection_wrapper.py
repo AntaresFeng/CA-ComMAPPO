@@ -15,7 +15,7 @@ DEFAULT_ENV_NAME = "HighwayIntersection"
 DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
 GLOBAL_OBSERVATION_FEATURES = ("presence", "x", "y", "vx", "vy", "cos_h", "sin_h")
-INTERSECTION_CENTER = np.zeros(2, dtype=np.float32) # (0.0, 0.0)
+INTERSECTION_CENTER = np.zeros(2, dtype=np.float32)  # (0.0, 0.0)
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
