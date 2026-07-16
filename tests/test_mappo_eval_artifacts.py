@@ -296,6 +296,7 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
         env_name="HighwayIntersection",
         env_id="intersection-multi-agent-v1",
         seed=3,
+        env_seed=21,
         logger="tensorboard",
         running_steps=16,
         parallels=1,
@@ -316,8 +317,13 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
             "episodes": [{"episode_index": 0}],
         },
     ]
+    make_envs_configs = []
 
-    monkeypatch.setattr(mappo_training, "make_envs", lambda _configs: fake_env)
+    def fake_make_envs(configs_test):
+        make_envs_configs.append(configs_test)
+        return fake_env
+
+    monkeypatch.setattr(mappo_training, "make_envs", fake_make_envs)
     monkeypatch.setattr(
         mappo_training,
         "evaluate_highway_policy",
@@ -344,6 +350,9 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
     assert rows[1]["is_initial_eval"] is False
     assert rows[1]["is_best"] is True
     assert rows[1]["step"] == 16
+    assert len(make_envs_configs) == 1
+    assert make_envs_configs[0].env_seed == configs.seed + 10_000
+    assert configs.env_seed == 21
     assert fake_env.closed is True
 
 

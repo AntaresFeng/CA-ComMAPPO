@@ -97,6 +97,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self.state_space = self._build_state_space()
         self.max_episode_steps = self._max_episode_steps()
         self._initial_seed = getattr(env_config, "env_seed", None)
+        self._has_reset = False
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
         self._scene_ready = False
@@ -308,9 +309,14 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         return global_obs
 
     def reset(self, **kwargs):
-        if "seed" not in kwargs and self._initial_seed is not None:
+        if (
+            not self._has_reset
+            and "seed" not in kwargs
+            and self._initial_seed is not None
+        ):
             kwargs["seed"] = self._initial_seed
         observation, _info = self.env.reset(**kwargs)
+        self._has_reset = True
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()

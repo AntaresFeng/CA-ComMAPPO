@@ -446,6 +446,33 @@ def test_flatten_observations_option_exposes_one_dimensional_spaces_and_obs():
         env.close()
 
 
+def test_env_seed_is_only_injected_on_first_implicit_reset(monkeypatch):
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            env_seed=17,
+            highway_config={"controlled_vehicles": 2, "duration": 2},
+        )
+    )
+    reset_calls = []
+    original_reset = env.env.reset
+
+    def reset_spy(**kwargs):
+        reset_calls.append(kwargs.copy())
+        return original_reset(**kwargs)
+
+    monkeypatch.setattr(env.env, "reset", reset_spy)
+
+    try:
+        env.reset()
+        env.reset()
+        env.reset(seed=23)
+        env.reset()
+
+        assert reset_calls == [{"seed": 17}, {}, {"seed": 23}, {}]
+    finally:
+        env.close()
+
+
 def test_collision_global_termination_marks_all_agents_done():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
