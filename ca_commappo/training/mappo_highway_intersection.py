@@ -35,6 +35,7 @@ from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "mappo"
+EVAL_ENV_SEED_OFFSET = 10_000
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -278,6 +279,7 @@ def benchmark(
 ) -> None:
     configs_test = deepcopy(configs)
     configs_test.parallels = configs_test.test_episode
+    configs_test.env_seed = configs_test.seed + EVAL_ENV_SEED_OFFSET
     test_envs = make_envs(configs_test)
     try:
         write_eval_run_metadata(configs, agents, mode="benchmark")
