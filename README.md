@@ -50,10 +50,13 @@ uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-s
 
 适配器的 `step()` 返回值采用 XuanCe 训练侧语义：返回的 `rewards` 字典和 `info["agents_rewards"]` 都是经过 active-agent mask 处理后的 adapter-facing reward。已经终止的 agent 在后续 transition 中 reward 记为 `0.0`，并且动作会被替换为 `IDLE_ACTION`。如果需要查看 highway-env 原始 per-agent reward，使用 `info["raw_agents_rewards"]`。环境级结束信号写在 `info["global_terminated"]`，碰撞状态写在 per-agent tuple 形式的 `info["crashed"]`。
 
-## MAPPO Video Evaluation
+## MAPPO 模型验证与视频录制
 
-Each MAPPO command creates an isolated run directory under `runs/mappo_highway/`
-by default. The resolved layout is:
+完整使用说明见
+[MAPPO 模型验证与视频录制](docs/mappo_model_evaluation_and_video.md)，包括
+checkpoint 与配置匹配、正式验证指标、视频参数、产物目录和复现规则。
+
+每次 MAPPO 命令默认都会在 `runs/mappo_highway/` 下创建独立的运行目录：
 
 ```text
 runs/mappo_highway/<timestamp>_<mode>_seed_<seed>/
@@ -66,15 +69,17 @@ runs/mappo_highway/<timestamp>_<mode>_seed_<seed>/
 `-- videos/                  # test --record-video
 ```
 
-Use `--output-dir` only when the run root itself needs to be redirected. The
-per-run folder, log directory, model directory, and default video directory are
-always derived automatically. The same run ID is also used as the W&B display
-name and stored in the W&B config.
+仅在需要修改运行根目录时使用 `--output-dir`。每次运行的子目录、log 目录、
+模型目录和默认视频目录都会自动生成。同一个 run ID 也会作为 W&B 显示名称并写入
+W&B 配置。
 
-Record representative videos while testing a trained MAPPO checkpoint:
+验证训练完成的 checkpoint 并录制代表性视频：
 
 ```powershell
-uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --mode test --model-dir-load runs/mappo_highway/<benchmark_run>/models/best_model.pth --test-episode 32 --record-video
+uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --mode test --model-dir-load runs/mappo_highway/<benchmark_run>/models/best_model.pth --test-episode 100 --record-video --video-episodes 6
 ```
 
-By default this records `min(test_episode, 6)` representative episodes under the run log directory's `videos/` folder and writes `video_eval_summary.json`, individual MP4s, a contact sheet, and a combined MP4.
+默认视频数量为 `min(test_episode, 6)`。视频保存在本次 test run 的 `videos/`
+目录，同时生成 `video_eval_summary.json`、逐 episode MP4、缩略图总览和合并
+MP4。正式评估结果保存在 run 根目录的 `eval_metadata.json` 和
+`eval_records.jsonl`。
