@@ -120,6 +120,34 @@ def _write_tiny_video(path: Path, color: tuple[int, int, int]) -> None:
     writer.release()
 
 
+def test_preview_frame_uses_final_low_contrast_frame(tmp_path):
+    video = tmp_path / "contrast-then-uniform.mp4"
+    writer = cv2.VideoWriter(
+        str(video),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        10,
+        (32, 32),
+    )
+    assert writer.isOpened()
+    try:
+        checkerboard = np.indices((32, 32)).sum(axis=0) % 2
+        high_contrast = np.repeat(
+            (checkerboard * 255).astype(np.uint8)[:, :, None],
+            3,
+            axis=2,
+        )
+        final_uniform = np.full((32, 32, 3), 64, dtype=np.uint8)
+        writer.write(high_contrast)
+        writer.write(final_uniform)
+    finally:
+        writer.release()
+
+    preview = video_recorder._last_preview_frame(video)
+
+    assert float(preview.std()) < 20.0
+    assert float(preview.mean()) == pytest.approx(64.0, abs=15.0)
+
+
 class FakeSingleEnv:
     agents = ["agent_0", "agent_1"]
     max_episode_steps = 4

@@ -309,26 +309,22 @@ def _cv2() -> Any:
     return cv2
 
 
-def _best_preview_frame(video_path: str | Path) -> np.ndarray:
+def _last_preview_frame(video_path: str | Path) -> np.ndarray:
     cv2 = _cv2()
     capture = cv2.VideoCapture(str(video_path))
     try:
-        best_frame: np.ndarray | None = None
-        best_score = -1.0
+        last_frame: np.ndarray | None = None
         while True:
             ok, frame = capture.read()
             if not ok:
                 break
-            score = float(frame.std())
-            if score > best_score:
-                best_score = score
-                best_frame = frame
+            last_frame = frame
     finally:
         capture.release()
 
-    if best_frame is None:
+    if last_frame is None:
         raise RuntimeError(f"No frames found in video: {video_path}")
-    return best_frame
+    return last_frame
 
 
 def _record_label(record: dict[str, Any]) -> str:
@@ -418,7 +414,7 @@ def create_contact_sheet(
             y0 = row * cell_height
             x0 = column * cell_width
             record = _record_for_video(video, records_by_index)
-            frame = cv2.resize(_best_preview_frame(video), (cell_width, frame_height))
+            frame = cv2.resize(_last_preview_frame(video), (cell_width, frame_height))
             sheet[y0 : y0 + frame_height, x0 : x0 + cell_width] = frame
             label = _record_label(record)
             cv2.putText(
