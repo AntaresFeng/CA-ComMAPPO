@@ -5,14 +5,23 @@
 
 ## 入口
 
-推荐通过项目顶层命令运行：
+推荐通过项目顶层命令运行（统一训练脚本，支持 IPPO/MAPPO）：
 
 ```bash
+# MAPPO
 uv run python main.py mappo [参数]
+
+# IPPO
+uv run python main.py ippo [参数]
 ```
 
-它会将参数转发给
-`ca_commappo.training.mappo_highway_intersection`。模型验证使用
+也可以直接调用模块：
+
+```bash
+uv run python -m ca_commappo.training.train_highway_intersection --config <配置.yaml> --mode test [参数]
+```
+
+脚本会根据配置文件中的 `agent` 字段（"IPPO" 或 "MAPPO"）自动选择对应的 Agent 类。模型验证使用
 `--mode test`；视频录制是在正式验证结束后执行的可选步骤，只能与
 `--mode test` 一起使用。
 

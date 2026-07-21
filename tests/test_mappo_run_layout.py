@@ -1,7 +1,7 @@
 from argparse import Namespace
 from datetime import datetime, timezone
 
-from ca_commappo.training import mappo_highway_intersection as mappo_training
+from ca_commappo.training import train_highway_intersection as mappo_training
 from ca_commappo.training.mappo_run_layout import (
     align_wandb_run_name,
     prepare_run_directory,

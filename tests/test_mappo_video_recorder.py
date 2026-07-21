@@ -15,7 +15,7 @@ from ca_commappo.evaluation.mappo_video_recorder import (
     resolve_video_episode_count,
     write_video_eval_summary,
 )
-from ca_commappo.training.mappo_highway_intersection import (
+from ca_commappo.training.train_highway_intersection import (
     build_parser,
     cli_overrides,
     main,

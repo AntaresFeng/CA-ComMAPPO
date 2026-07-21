@@ -16,17 +16,22 @@ uv run python -m ca_commappo.cli.run_sanity_baseline --config configs/sanity/hig
 uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper --seed 7 --max-steps 1
 ```
 
-运行 highway intersection MAPPO 小参数烟测：
+运行 highway intersection MAPPO/IPPO 小参数烟测：
 
 ```powershell
-uv run python -m ca_commappo.training.mappo_highway_intersection --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+# IPPO smoke test
+uv run python -m ca_commappo.training.train_highway_intersection --config configs/ippo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+
+# MAPPO smoke test
+uv run python -m ca_commappo.training.train_highway_intersection --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
 ```
 
-也可以通过顶层 dispatcher 调用：
+也可以通过顶层 dispatcher 调用（统一训练脚本，根据配置中的 `agent` 字段自动选择算法）：
 
 ```powershell
 uv run python main.py sanity --config configs/sanity/highway_intersection.yaml --policy all
 uv run python main.py debug-wrapper --target wrapper --seed 7 --max-steps 1
+uv run python main.py ippo --config configs/ippo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
 ```
 
@@ -35,8 +40,9 @@ uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-s
 - `ca_commappo/envs/`: highway-env 到 XuanCe 多智能体接口的环境适配器，以及 wrapper 端到端调试工具。
 - `ca_commappo/evaluation/`: sanity baseline 执行和 summary 逻辑。
 - `ca_commappo/cli/`: 本项目维护的普通命令行入口，例如 sanity baseline 运行入口。
-- `ca_commappo/training/`: 本项目维护的训练入口。
+- `ca_commappo/training/`: 统一训练脚本（`train_highway_intersection.py`），支持 IPPO/MAPPO；保留旧脚本作为向后兼容别名。
 - `configs/sanity/`: sanity baseline 配置。
+- `configs/ippo/`: highway intersection IPPO 配置。
 - `configs/mappo/`: highway intersection MAPPO 配置。
 - `examples/mappo/`: vendored XuanCe MAPPO 上游参考示例，仅作参考，不放本项目维护代码。
 - `docs/`: 设计说明、排查记录和实验协议。

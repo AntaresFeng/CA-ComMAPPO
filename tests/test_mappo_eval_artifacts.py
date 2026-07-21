@@ -15,7 +15,7 @@ from ca_commappo.evaluation.mappo_eval_artifacts import (
     json_safe,
     write_eval_metadata,
 )
-from ca_commappo.training import mappo_highway_intersection as mappo_training
+from ca_commappo.training import train_highway_intersection as mappo_training
 
 
 class FakeAgent:

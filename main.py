@@ -5,7 +5,8 @@ from typing import Any
 
 COMMAND_MODULES = {
     "debug-wrapper": "ca_commappo.envs.debug_highway_wrapper",
-    "mappo": "ca_commappo.training.mappo_highway_intersection",
+    "ippo": "ca_commappo.training.train_highway_intersection",
+    "mappo": "ca_commappo.training.train_highway_intersection",
     "sanity": "ca_commappo.cli.run_sanity_baseline",
 }
 
