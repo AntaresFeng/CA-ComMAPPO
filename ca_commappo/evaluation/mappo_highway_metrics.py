@@ -155,6 +155,8 @@ def _episode_record_from_info(
         arrived_agents=info["arrived"],
         truncated=bool(truncated),
         score=score,
+        waiting_steps=info.get("waiting_steps"),
+        dt=info.get("dt"),
     )
 
 

@@ -12,6 +12,9 @@ from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 DEFAULT_ENV_NAME = "HighwayIntersection"
 DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
+# A controlled vehicle is counted as "waiting" while its speed is below this
+# threshold (m/s). Used for the Phase 4 mean_waiting_time metric.
+WAITING_SPEED_THRESHOLD = 1.0
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
@@ -94,6 +97,16 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self._has_reset = False
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        # Per-agent accumulated low-speed step count for the waiting-time metric
+        # (Phase 4). Persisted across steps within an episode, reset on reset().
+        self._waiting_steps = {agent: 0 for agent in self.agents}
+        self._dt = self._compute_dt()
+
+    def _compute_dt(self) -> float:
+        policy_frequency = float(
+            self.env.unwrapped.config.get("policy_frequency", 1) or 1
+        )
+        return 1.0 / policy_frequency if policy_frequency > 0 else 0.0
 
     def _validate_multi_agent_spaces(self) -> None:
         if not isinstance(self.env.observation_space, spaces.Tuple):
@@ -203,6 +216,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        self._waiting_steps = {agent: 0 for agent in self.agents}
         self._remember_obs(obs_dict)
         return obs_dict, {}
 
@@ -238,6 +252,20 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # true crash state of every controlled vehicle.
         info["crashed"] = crashed
         info["arrived"] = arrived
+        # Phase 4 reporting: per-agent speed (m/s) and accumulated low-speed
+        # step count. Only accumulate for agents that were active *before* this
+        # step (post-termination IDLE steps do not count as waiting).
+        agents_speeds = tuple(
+            float(v.speed) for v in self.env.unwrapped.controlled_vehicles
+        )
+        for i, agent in enumerate(self.agents):
+            if active_before_step[agent] and agents_speeds[i] < WAITING_SPEED_THRESHOLD:
+                self._waiting_steps[agent] += 1
+        info["agents_speeds"] = agents_speeds
+        info["waiting_steps"] = tuple(
+            self._waiting_steps[agent] for agent in self.agents
+        )
+        info["dt"] = self._dt
         self._last_agent_mask = active_before_step
         self._active_agents = {
             agent: active_before_step[agent] and not bool(terminated[agent])

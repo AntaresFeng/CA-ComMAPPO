@@ -136,6 +136,39 @@ def test_reset_step_and_state_are_xuance_compatible():
         env.close()
 
 
+def test_step_info_exposes_speed_waiting_and_dt_for_reporting():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(highway_config={"controlled_vehicles": 3, "duration": 2})
+    )
+    try:
+        env.reset(seed=0)
+        actions = {agent: 1 for agent in env.agents}  # IDLE
+
+        _obs, _rewards, _terminated, _truncated, step_info = env.step(actions)
+        assert "agents_speeds" in step_info
+        assert "waiting_steps" in step_info
+        assert "dt" in step_info
+        assert len(step_info["agents_speeds"]) == env.num_agents
+        assert len(step_info["waiting_steps"]) == env.num_agents
+        assert all(isinstance(v, float) for v in step_info["agents_speeds"])
+        assert all(isinstance(v, int) and v >= 0 for v in step_info["waiting_steps"])
+        assert step_info["dt"] > 0.0
+
+        # Accumulation is non-decreasing across steps and resets on reset().
+        first_waiting = step_info["waiting_steps"]
+        _obs, _r, _t, _tr, step_info2 = env.step(actions)
+        assert all(
+            step_info2["waiting_steps"][i] >= first_waiting[i]
+            for i in range(env.num_agents)
+        )
+
+        env.reset(seed=0)
+        _obs, _r, _t, _tr, step_info3 = env.step(actions)
+        assert all(v == 0 for v in step_info3["waiting_steps"])
+    finally:
+        env.close()
+
+
 def test_flatten_observations_option_exposes_one_dimensional_spaces_and_obs():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(

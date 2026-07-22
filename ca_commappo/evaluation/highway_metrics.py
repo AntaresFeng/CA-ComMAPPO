@@ -30,6 +30,8 @@ def build_episode_record(
     policy: str | None = None,
     seed: int | None = None,
     score: float | None = None,
+    waiting_steps: Sequence[float] | None = None,
+    dt: float | None = None,
 ) -> dict[str, Any]:
     rewards = {agent: float(reward) for agent, reward in agent_rewards.items()}
     num_agents = len(rewards)
@@ -66,6 +68,20 @@ def build_episode_record(
             "agent_arrival_fraction": _mean_bool(arrived),
         }
     )
+
+    # Phase 4 reporting metrics (conditional on dt / waiting_steps). These are
+    # for reporting only; they never enter the best-model sort key.
+    if dt is not None:
+        travel_time = float(int(steps) * float(dt))
+        duration = travel_time
+        arrived_count = sum(1 for value in arrived if value)
+        throughput = float(arrived_count / duration) if duration > 0 else 0.0
+        record["travel_time"] = travel_time
+        record["throughput"] = throughput
+        if waiting_steps is not None:
+            waiting = [float(value) for value in waiting_steps]
+            mean_waiting_steps = sum(waiting) / len(waiting) if waiting else 0.0
+            record["waiting_time"] = float(mean_waiting_steps * float(dt))
     return record
 
 
@@ -93,6 +109,10 @@ def summarize_episode_records(records: list[dict[str, Any]]) -> dict[str, float 
     for key in ("agent_collision_fraction", "agent_arrival_fraction"):
         if all(key in record for record in records):
             summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)
+    # Phase 4 reporting metrics (conditional; only when every record carries them).
+    for key in ("travel_time", "throughput", "waiting_time"):
+        if all(key in record for record in records):
+            summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)
     return summary
 
 
@@ -118,6 +138,9 @@ def format_summary_lines(
         "truncation_rate",
         "mean_agent_collision_fraction",
         "mean_agent_arrival_fraction",
+        "mean_travel_time",
+        "mean_throughput",
+        "mean_waiting_time",
     ]
     lines = []
     for key in ordered_keys:
