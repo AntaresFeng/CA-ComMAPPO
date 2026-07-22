@@ -1,7 +1,6 @@
 dl_toolbox: "torch"
 project_name: "CA-ComMAPPO"
-logger: "wandb"
-wandb_user_name: "antaresx403-bupt"
+logger: "tensorboard"
 render: false
 render_mode: "rgb_array"
 fps: 15
