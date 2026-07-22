@@ -52,6 +52,8 @@ class ConflictAwareComm(Module):
                     penalty ``R_i = 1 - intent_i``).
     recede_penalty: fixed hyperparameter ``mu`` penalising receding pairs.
     lam_init:       initial value of the learnable scalar ``lambda``.
+    use_conflict_prior: if False, ``b_ij = 0`` (ablation (c): attention comm
+                    with the conflict prior removed; scores are ``q.k`` only).
     """
 
     def __init__(
@@ -63,6 +65,7 @@ class ConflictAwareComm(Module):
         intent_slot: int,
         recede_penalty: float = 10.0,
         lam_init: float = 1.0,
+        use_conflict_prior: bool = True,
         device: Optional[Union[str, int, torch.device]] = None,
     ):
         super().__init__()
@@ -72,6 +75,7 @@ class ConflictAwareComm(Module):
         self.ttc_slot = ttc_slot
         self.intent_slot = intent_slot
         self.recede_penalty = float(recede_penalty)
+        self.use_conflict_prior = bool(use_conflict_prior)
         self.device = device
 
         self.W_q = nn.Linear(msg_dim, comm_dim, device=device)
@@ -101,9 +105,15 @@ class ConflictAwareComm(Module):
         v = self.W_v(m_send)
 
         dot = torch.einsum("eid,ejd->eij", q, k) / self.scale  # (E, A, A)
-        ttc_bias = -self.lam * torch.abs(ttc[:, :, None] - ttc[:, None, :])
-        recede_bias = -self.recede_penalty * (recede[:, :, None] + recede[:, None, :])
-        scores = dot + ttc_bias + recede_bias
+        if self.use_conflict_prior:
+            ttc_bias = -self.lam * torch.abs(ttc[:, :, None] - ttc[:, None, :])
+            recede_bias = -self.recede_penalty * (
+                recede[:, :, None] + recede[:, None, :]
+            )
+            scores = dot + ttc_bias + recede_bias
+        else:
+            # Ablation (c): attention comm without the conflict prior (b_ij = 0).
+            scores = dot
 
         alive = self._alive_2d(alive_ally, n_env, n_agents, device)  # (E, A)
         alive_j = alive[:, None, :].expand(n_env, n_agents, n_agents).bool()

@@ -67,6 +67,7 @@ class CAComMAPPOActorRep(Module):
         comm_dim: Optional[int] = None,
         recede_penalty: float = 10.0,
         ttc_max: float = TTC_MAX,
+        use_conflict_prior: bool = True,
         **kwargs,
     ):
         super().__init__()
@@ -95,6 +96,7 @@ class CAComMAPPOActorRep(Module):
             ttc_slot=hidden,
             intent_slot=hidden + 1,
             recede_penalty=recede_penalty,
+            use_conflict_prior=use_conflict_prior,
             device=device,
         )
         self.output_shapes = {"state": (hidden + self.comm_dim,)}
@@ -222,6 +224,7 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
                 comm_dim=self.config.representation_hidden_size[-1],
                 recede_penalty=getattr(self.config, "recede_penalty", 10.0),
                 ttc_max=getattr(self.config, "ttc_max", TTC_MAX),
+                use_conflict_prior=getattr(self.config, "use_conflict_prior", True),
             )
 
         # Critic representation: plain PI encoder (no comm).

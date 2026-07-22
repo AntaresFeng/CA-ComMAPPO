@@ -160,3 +160,54 @@ class TestConflictScenario:
         alpha_approach = comm.attention(m_approach, alive)[0, 0, 1].item()
         alpha_recede = comm.attention(m_recede, alive)[0, 0, 1].item()
         assert alpha_approach > alpha_recede
+
+
+class TestAblationNoConflictPrior:
+    """Phase 4 ablation (c): attention comm but b_ij = 0 (no conflict prior).
+
+    With W_q/W_k zeroed the scores are b_ij only, so disabling the prior makes
+    attention uniform over valid receivers, while enabling it (with differing
+    ttc) makes it non-uniform.
+    """
+
+    def _build(self, use_prior: bool) -> ConflictAwareComm:
+        return ConflictAwareComm(
+            msg_dim=MSG_DIM,
+            comm_dim=COMM_DIM,
+            n_agents=N_AGENTS,
+            ttc_slot=TTC_SLOT,
+            intent_slot=INTENT_SLOT,
+            recede_penalty=10.0,
+            use_conflict_prior=use_prior,
+            device="cpu",
+        )
+
+    def _zero_qk(self, comm):
+        with torch.no_grad():
+            comm.W_q.weight.zero_()
+            comm.W_q.bias.zero_()
+            comm.W_k.weight.zero_()
+            comm.W_k.bias.zero_()
+
+    def test_no_prior_gives_uniform_attention_with_zeroed_qk(self):
+        comm = self._build(use_prior=False)
+        self._zero_qk(comm)
+        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 3.0]])
+        alive = torch.ones(1, N_AGENTS)
+        alpha = comm.attention(m, alive)[0]  # (A, A)
+        # Each receiver i has n_agents-1 valid partners (self excluded); with
+        # b_ij=0 the softmax is uniform -> each partner gets 1/(A-1).
+        for i in range(N_AGENTS):
+            partners = [alpha[i, j].item() for j in range(N_AGENTS) if j != i]
+            assert all(abs(p - partners[0]) < 1e-6 for p in partners)
+            assert abs(partners[0] - 1.0 / (N_AGENTS - 1)) < 1e-6
+
+    def test_prior_makes_attention_nonuniform_with_zeroed_qk(self):
+        comm = self._build(use_prior=True)
+        self._zero_qk(comm)
+        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 10.0]])
+        alive = torch.ones(1, N_AGENTS)
+        alpha = comm.attention(m, alive)[0]
+        # Agent 0's two partners (1, 2) have |ttc diff| 1 and 9 -> non-uniform.
+        a01, a02 = alpha[0, 1].item(), alpha[0, 2].item()
+        assert abs(a01 - a02) > 1e-4
