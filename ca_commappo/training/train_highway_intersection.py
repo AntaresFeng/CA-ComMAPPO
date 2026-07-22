@@ -11,6 +11,7 @@ from xuance.torch.agents import IPPO_Agents, MAPPO_Agents, CommNet_Agents, IC3Ne
 from xuance.torch.utils.operations import set_seed
 
 from ca_commappo.algorithms import register_components
+from ca_commappo.algorithms.ca_commappo_agents import CA_ComMAPPO_Agents
 from ca_commappo.algorithms.comm_runtime_patch import patch_comm_agents_info
 from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
@@ -50,6 +51,7 @@ AGENT_REGISTRY = {
     "MAPPO": MAPPO_Agents,
     "COMMNET": CommNet_Agents,
     "IC3NET": IC3Net_Agents,
+    "CA_COMMAPPO": CA_ComMAPPO_Agents,
 }
 
 

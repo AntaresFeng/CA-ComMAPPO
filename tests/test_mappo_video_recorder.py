@@ -11,6 +11,7 @@ from ca_commappo.evaluation.mappo_video_recorder import (
     VIDEO_SUMMARY_FILENAME,
     combine_episode_videos,
     create_contact_sheet,
+    derive_video_name_prefix,
     record_mappo_policy_videos,
     resolve_video_episode_count,
     write_video_eval_summary,
@@ -84,6 +85,27 @@ def test_cli_overrides_includes_explicit_video_output_disables():
 
     assert overrides["video_contact_sheet"] is False
     assert overrides["video_combined"] is False
+
+
+@pytest.mark.parametrize(
+    "agent,expected",
+    [
+        ("MAPPO", "mappo_test"),
+        ("IPPO", "ippo_test"),
+        ("COMMNET", "commnet_test"),
+        ("IC3NET", "ic3net_test"),
+        ("CA_COMMAPPO", "ca_commappo_test"),
+    ],
+)
+def test_derive_video_name_prefix_from_agent(agent, expected):
+    configs = Namespace(agent=agent, seed=1, render_mode="rgb_array")
+    assert derive_video_name_prefix(configs) == expected
+
+
+def test_derive_video_name_prefix_defaults_to_mappo_when_no_agent():
+    # Legacy / test configs that build a bare Namespace keep the mappo_test default.
+    configs = Namespace(seed=1, render_mode="rgb_array")
+    assert derive_video_name_prefix(configs) == "mappo_test"
 
 
 def test_record_video_train_mode_fails_before_loading_configs(monkeypatch):

@@ -20,8 +20,21 @@ from ca_commappo.evaluation.highway_metrics import (
 
 DEFAULT_VIDEO_EPISODE_LIMIT = 6
 VIDEO_SUMMARY_FILENAME = "video_eval_summary.json"
-CONTACT_SHEET_FILENAME = "mappo_test_contact_sheet.jpg"
-COMBINED_VIDEO_FILENAME = "mappo_test_all_episodes.mp4"
+DEFAULT_VIDEO_NAME_PREFIX = "mappo_test"
+
+
+def derive_video_name_prefix(configs: Any) -> str:
+    """Derive the video file name prefix from the agent string.
+
+    ``configs.agent`` lowercased + ``"_test"`` (e.g. MAPPO -> ``mappo_test``,
+    CA_COMMAPPO -> ``ca_commappo_test``). Falls back to ``mappo_test`` when the
+    config has no ``agent`` attribute (keeps the legacy default for tests that
+    build a bare Namespace).
+    """
+    agent = getattr(configs, "agent", None)
+    if not agent:
+        return DEFAULT_VIDEO_NAME_PREFIX
+    return f"{str(agent).lower()}_test"
 
 
 def resolve_video_episode_count(test_episode: int, requested: str | None) -> int:
@@ -89,17 +102,20 @@ def _false_tuple_for_agents(env: Any) -> tuple[bool, ...]:
     return tuple(False for _agent in getattr(env, "agents", ()))
 
 
-def _expected_mappo_video_path(video_dir: Path, episode_index: int) -> Path:
-    return video_dir / f"mappo_test-episode-{episode_index}.mp4"
+def _expected_mappo_video_path(
+    video_dir: Path, episode_index: int, name_prefix: str = DEFAULT_VIDEO_NAME_PREFIX
+) -> Path:
+    return video_dir / f"{name_prefix}-episode-{episode_index}.mp4"
 
 
 def _capture_existing_exact_video_mtimes(
     video_dir: Path,
     episode_count: int,
+    name_prefix: str = DEFAULT_VIDEO_NAME_PREFIX,
 ) -> dict[Path, int]:
     mtimes = {}
     for episode_index in range(episode_count):
-        video_path = _expected_mappo_video_path(video_dir, episode_index)
+        video_path = _expected_mappo_video_path(video_dir, episode_index, name_prefix)
         if video_path.exists():
             mtimes[video_path] = video_path.stat().st_mtime_ns
     return mtimes
@@ -110,6 +126,7 @@ def _validate_video_files_for_records(
     records: list[dict[str, Any]],
     episode_count: int,
     previous_exact_mtimes: dict[Path, int],
+    name_prefix: str = DEFAULT_VIDEO_NAME_PREFIX,
 ) -> list[Path]:
     videos = [Path(video_file) for video_file in video_files]
     if len(videos) != len(records) or len(records) != episode_count:
@@ -122,7 +139,7 @@ def _validate_video_files_for_records(
     expected_indices = set(range(episode_count))
     expected_paths = (
         [
-            _expected_mappo_video_path(videos[0].parent, index)
+            _expected_mappo_video_path(videos[0].parent, index, name_prefix)
             for index in range(episode_count)
         ]
         if videos
@@ -178,11 +195,13 @@ def record_mappo_policy_videos(
     if episode_count <= 0:
         raise ValueError("episode_count must be a positive integer")
 
+    name_prefix = derive_video_name_prefix(configs)
     output_dir = Path(video_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     previous_exact_mtimes = _capture_existing_exact_video_mtimes(
         output_dir,
         episode_count,
+        name_prefix,
     )
 
     video_configs = deepcopy(configs)
@@ -195,7 +214,7 @@ def record_mappo_policy_videos(
             recording_env.env,
             video_folder=str(output_dir),
             episode_trigger=lambda _episode_id: True,
-            name_prefix="mappo_test",
+            name_prefix=name_prefix,
             disable_logger=True,
         )
         if hasattr(recording_env.env.unwrapped, "set_record_video_wrapper"):
@@ -242,7 +261,7 @@ def record_mappo_policy_videos(
                     arrived_agents=latest_info.get("arrived", default_agent_flags),
                     truncated=bool(truncated),
                     phase="video_eval",
-                    policy="mappo_test",
+                    policy=name_prefix,
                     seed=seed,
                     score=_mean_agent_reward(agent_rewards),
                 )
@@ -251,34 +270,37 @@ def record_mappo_policy_videos(
         recording_env.close()
 
     video_files = _validate_video_files_for_records(
-        sorted(output_dir.glob("mappo_test-episode-*.mp4")),
+        sorted(output_dir.glob(f"{name_prefix}-episode-*.mp4")),
         records,
         episode_count,
         previous_exact_mtimes,
+        name_prefix,
     )
     summary = summarize_episode_records(records)
     contact_sheet_path = None
     combined_video_path = None
+    contact_sheet_name = f"{name_prefix}_contact_sheet.jpg"
+    combined_video_name = f"{name_prefix}_all_episodes.mp4"
     if make_contact_sheet:
         contact_sheet_path = str(
             create_contact_sheet(
                 video_files,
                 records,
-                output_dir / CONTACT_SHEET_FILENAME,
+                output_dir / contact_sheet_name,
             )
         )
     else:
-        _unlink_if_exists(output_dir / CONTACT_SHEET_FILENAME)
+        _unlink_if_exists(output_dir / contact_sheet_name)
     if make_combined_video:
         combined_video_path = str(
             combine_episode_videos(
                 video_files,
                 records,
-                output_dir / COMBINED_VIDEO_FILENAME,
+                output_dir / combined_video_name,
             )
         )
     else:
-        _unlink_if_exists(output_dir / COMBINED_VIDEO_FILENAME)
+        _unlink_if_exists(output_dir / combined_video_name)
 
     payload: dict[str, Any] = {
         "schema_version": 1,

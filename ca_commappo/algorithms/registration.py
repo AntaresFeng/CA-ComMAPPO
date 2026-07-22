@@ -33,10 +33,18 @@ def register_components() -> None:
     Safe to call multiple times. Currently registers:
 
     * ``PermutationInvariantAttention`` -> ``REGISTRY_Representation``
-      (Attention-MAPPO / CA-ComMAPPO shared encoder).
-
-    Phase 3 will extend this with the CA-ComMAPPO policy and learner.
+      (Attention-MAPPO / CA-ComMAPPO shared encoder);
+    * ``CA_ComMAPPO_Policy`` -> ``REGISTRY_Policy`` (thin MAAC_Policy subclass;
+      comm lives in the actor representation);
+    * ``CA_ComMAPPO_Learner`` -> ``REGISTRY_Learners`` (thin MAPPO_Learner subclass).
     """
+    from xuance.torch.learners import REGISTRY_Learners
+    from xuance.torch.policies import REGISTRY_Policy
+
+    from ca_commappo.algorithms.ca_commappo_agents import (
+        CA_ComMAPPO_Learner,
+        CA_ComMAPPO_Policy,
+    )
     from ca_commappo.algorithms.representations import PermutationInvariantAttention
 
     _register(
@@ -44,3 +52,5 @@ def register_components() -> None:
         "PermutationInvariantAttention",
         PermutationInvariantAttention,
     )
+    _register(REGISTRY_Policy, "CA_ComMAPPO_Policy", CA_ComMAPPO_Policy)
+    _register(REGISTRY_Learners, "CA_ComMAPPO_Learner", CA_ComMAPPO_Learner)
