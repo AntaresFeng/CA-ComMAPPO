@@ -95,7 +95,7 @@ def test_record_video_train_mode_fails_before_loading_configs(monkeypatch):
         raise AssertionError("load_configs should not be called")
 
     monkeypatch.setattr(
-        "ca_commappo.training.mappo_highway_intersection.load_configs",
+        "ca_commappo.training.train_highway_intersection.load_configs",
         fail_if_called,
     )
 
