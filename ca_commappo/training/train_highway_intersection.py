@@ -7,10 +7,11 @@ import numpy as np
 import wandb
 from xuance.common import load_yaml, recursive_dict_update
 from xuance.environment import make_envs
-from xuance.torch.agents import IPPO_Agents, MAPPO_Agents
+from xuance.torch.agents import IPPO_Agents, MAPPO_Agents, CommNet_Agents, IC3Net_Agents
 from xuance.torch.utils.operations import set_seed
 
 from ca_commappo.algorithms import register_components
+from ca_commappo.algorithms.comm_runtime_patch import patch_comm_agents_info
 from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     register_highway_intersection_env,
@@ -47,6 +48,8 @@ EVAL_ENV_SEED_OFFSET = 10_000
 AGENT_REGISTRY = {
     "IPPO": IPPO_Agents,
     "MAPPO": MAPPO_Agents,
+    "COMMNET": CommNet_Agents,
+    "IC3NET": IC3Net_Agents,
 }
 
 
@@ -386,6 +389,7 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
     prepare_run_directory(configs, mode)
     patch_xuance_marl_buffer_aliases()
     register_components()
+    patch_comm_agents_info()
     set_seed(configs.seed)
     envs = make_envs(configs)
     agents = None

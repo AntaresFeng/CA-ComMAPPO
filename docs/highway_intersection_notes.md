@@ -38,3 +38,25 @@
 - `info["raw_agents_rewards"]` 保存 highway-env 原始 per-agent reward tuple。
 - agent 到达或终止后的下一步开始会被视为 inactive：adapter 会用 `IDLE_ACTION` 代替其动作，并把该 agent 的 adapter-facing reward 置为 `0.0`。
 - `info["global_terminated"]` 是环境级结束信号；`info["crashed"]` 是 per-agent crash tuple，不使用 highway-env 默认的单车 `info["crashed"]` 语义。
+
+## CommNet / IC3Net 集成注意事项
+
+CommNet / IC3Net（`xuance.torch.agents`）作为通信基线接入本项目时，有三处与 highway 适配器/评估器接口的偏差，已用运行时补丁和配置解决，记录如下。
+
+### 1. `action()` 需要 `info` 参数（已运行时打补丁）
+
+`CommNet_Agents.action()` / `IC3Net_Agents.action()` 都通过 `for data in info` 取每个 env 的 `agent_mask` 来构造 `alive_ally`，`info=None` 时立即 `TypeError`。但本项目评估器 `evaluate_highway_policy()`（`mappo_highway_metrics.py`）和视频录制器 `_agent_action_for_single_env`（`mappo_video_recorder.py`）调 `agents.action(...)` 时**不传 `info`**。因此 `--mode test` / `--mode benchmark` 会崩；而 `--mode train` smoke 走 CommNet 自己的 `run_episodes()`（内部会构造并传入 `info`），**不暴露此问题**。
+
+补丁在 `ca_commappo/algorithms/comm_runtime_patch.py` 的 `patch_comm_agents_info()`：运行时 monkey-patch 两个 agent 类的 `action()`，当 `info is None` 时合成 `info = [{'agent_mask': {k: 1 for k in agent_keys}} for _ in range(n_env)]`（全 1，即所有 agent alive）。这与 CommNet `run_episodes()` 训练期构造 `info` 的方式（`commnet_agents.py` `info = [{'agent_mask': {k: True ...}} ...]`）完全一致，故 eval 行为与训练一致。补丁幂等、不改 `.venv`。`run()` 在构造 agent 前调用。
+
+### 2. CommNet 的 `run_episodes()` 不调训练期 callback（已知限制）
+
+CommNet 重写的 `run_episodes()`（`commnet_agents.py:155-252`）在 episode 结束时只调 `self.log_infos(step_info, ...)`，**不调 `callback.on_train_episode_info`**。IC3Net 继承该方法，行为相同。因此 `HighwayMetricsCallback` 在 CommNet/IC3Net 训练期收不到任何 per-episode 记录，训练期 highway 指标为空——**训练期指标以 eval 期（`evaluate_highway_policy`）为准**。`--mode benchmark` 的 eval 期记录正常落盘到 `eval_records.jsonl`。
+
+### 3. CommNet/IC3Net 配置必填项与类型
+
+- `use_rnn: true` + `representation: "Basic_RNN"`（必需，非可选）。CommNet/IC3Net 的 policy `forward` 依赖 RNN 路径；`use_rnn: false` 会在训练时崩。
+- `comm_passes`（CommNet/IC3Net 必填，本项目用 `1`）。
+- `gate_hidden_size`（IC3Net 必填）**必须是 list**，如 `[16]`，**不是标量 `16`**。原因：`IC3Net_Policy.__init__` 调 `communicator.create_mlp(recurrent_hidden_size, gate_hidden_size, 2, ...)`，而 `CommNet.create_mlp` 的第二个参数 `layers` 期望 list（内部 `len(layers)`）；传标量会 `TypeError: object of type 'int' has no len()`。canonical xuance IC3Net 配置用 `[64,]`。
+- `lr_decay_steps`（CommNet/IC3Net 必填）：`CommNet_Learner.build_optimizer` 一定会建 `LinearLR` 调度器并 `total_iters=lr_decay_steps`（即使 `use_linear_lr_decay: false`）。本项目用 `5000`（与 canonical xuance CommNet mpe 配置一致）。注意这是 CommNet/IC3Net 相对 MAPPO baseline 的一个行为差异（CommNet LR 会衰减），归档时记录。
+
