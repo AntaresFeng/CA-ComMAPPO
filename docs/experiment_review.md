@@ -33,11 +33,11 @@
 | 3 | 消融 **(c) no-prior 与 (d) full 在 n=2 下 bit-identical**（`max|c_full−c_no|=0`、`max|α_full−α_no|=0`）——主消融**无法检测冲突先验的贡献**。 |
 | 4 | 注意力可视化（论文 §7 卖点）在主配置下 `α` 恒为 `[[0,1],[1,0]]`——热力图无信息。 |
 
-**为何本地 smoke 没暴露**：所有 `*-smoke.yaml` 用 `controlled_vehicles: 3`（先验此时有效），而正式配置用 `2`——**smoke 对、正式错**，门禁为错误的原因放行。`tests/test_conflict_aware_comm.py` 也只用 `N_AGENTS=3`，给出"先验工作正常"的假象。
+**为何旧版 smoke 没暴露**：旧 `*-smoke.yaml` 用 `controlled_vehicles: 3`（先验此时有效），而正式配置用 `2`——**smoke 对、正式错**，门禁为错误的原因放行。现在两者已统一读取 highway 环境配置。
 
 **为何泛化实验没救它**：runbook §4 泛化训练在 `controlled_vehicles=4`（先验有效），但 (a) 该 gen4 配置**尚未生成**；(b) CommNet/IC3Net/MAPPO-MLP 输入维度固定，无法在 6/8/10 车运行——**没有任何一个"先验有效 且 通信 baseline 可比"的设置**。即论文核心卖点"冲突感知 > 平均通信"在整个矩阵里**无处可证**。
 
-**修复（最小且必须）**：所有正式配置 `controlled_vehicles` 提到 **≥3**（建议 3 或 4），`*-smoke.yaml` 与正式配置统一为同一车数；消融 (c)/(d) 必须在 ≥3 下重做；泛化实验训练车数与主比较一致或更高。**不修这一条，后续所有维度讨论的前提都不成立。**
+**修复（已落实到配置层）**：共享 highway 配置使用 `controlled_vehicles: 3`，正式和 smoke 不再各自定义车数；消融 (c)/(d) 必须在 ≥3 下重做。
 
 ---
 

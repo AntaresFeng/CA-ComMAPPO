@@ -20,10 +20,10 @@ uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper --seed 
 
 ```powershell
 # IPPO smoke test
-uv run python -m ca_commappo.training.train_highway_intersection --config configs/ippo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+uv run python -m ca_commappo.training.train_highway_intersection --config configs/ippo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save
 
 # MAPPO smoke test
-uv run python -m ca_commappo.training.train_highway_intersection --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+uv run python -m ca_commappo.training.train_highway_intersection --config configs/mappo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save
 ```
 
 也可以通过顶层 dispatcher 调用（统一训练脚本，根据配置中的 `agent` 字段自动选择算法）：
@@ -31,8 +31,8 @@ uv run python -m ca_commappo.training.train_highway_intersection --config config
 ```powershell
 uv run python main.py sanity --config configs/sanity/highway_intersection.yaml --policy all
 uv run python main.py debug-wrapper --target wrapper --seed 7 --max-steps 1
-uv run python main.py ippo --config configs/ippo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
-uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+uv run python main.py ippo --config configs/ippo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save
+uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save
 ```
 
 ## 项目结构

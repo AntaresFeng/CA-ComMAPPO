@@ -5,39 +5,39 @@
 
 ## 0. 通用约定（横向可比，不可违背）
 
-- **始终显式传 `--config`**（`config_path_for` 大小写敏感，Linux 远端会报 `FileNotFoundError`，见 §陷阱）。
+- 对比不同算法时显式传 `--config`；省略时默认加载 MAPPO 配置。
 - 算法由 YAML 的 `agent` 字段选择（不是 `main.py` 子命令名；子命令 `mappo` 只是路由）。
 - 横向对比固定：YAML（含 `env_seed`）、`test_episode`、`--seed`、`--video-seed`。
 - **远端多 seed 必须用 `--mode benchmark`**（才会落盘 `eval_metadata.json` + `eval_records.jsonl` + `best_model.pth`；纯 `--mode train` 不产 eval 记录，阶段 5 无法聚合）。最终数字取自 `best_model.pth` + `--mode test`。
-- 本地 smoke 用 `-smoke.yaml`（`logger: tensorboard`，无需 wandb）；远端正式配置 `logger: wandb`（远端需 `wandb login` 或 `WANDB_MODE=offline`）。
+- 本地 smoke 在正式配置上加 `--smoke`（自动切换 tensorboard 并缩小运行规模）；远端正式配置使用 wandb。
 - 指标统一口径：`ca_commappo/evaluation/highway_metrics.py` 的 9-key summary + Phase 4 扩展的 `mean_travel_time`/`mean_throughput`/`mean_waiting_time`（条件出现）。best-model 选择键 `arrival↑→collision↓→reward↑→length↓`（**不改**）。
 
 ## 1. 算法清单与配置
 
-| 算法 | `agent` | 主配置 | smoke 配置 | output_dir |
+| 算法 | `agent` | 主配置 | smoke | output_dir |
 |---|---|---|---|---|
-| IPPO | `IPPO` | `configs/ippo/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/ippo_highway/` |
-| MAPPO-MLP | `MAPPO` | `configs/mappo/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/mappo_highway/` |
-| Attention-MAPPO | `MAPPO` | `configs/attention_mappo/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/attention_mappo_highway/` |
-| CommNet | `COMMNET` | `configs/commnet/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/commnet_highway/` |
-| IC3Net | `IC3NET` | `configs/ic3net/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/ic3net_highway/` |
-| CA-ComMAPPO | `CA_COMMAPPO` | `configs/ca_commappo/intersection-multi-agent-v1.yaml` | `...-smoke.yaml` | `runs/ca_commappo_highway/` |
-| 通信消融 (c) 无冲突先验 | `CA_COMMAPPO` | `configs/ca_commappo/intersection-multi-agent-v1-no-prior.yaml` | `...-no-prior-smoke.yaml` | `runs/ca_commappo_no_prior_highway/` |
+| IPPO | `IPPO` | `configs/ippo/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/ippo_highway/` |
+| MAPPO-MLP | `MAPPO` | `configs/mappo/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/mappo_highway/` |
+| Attention-MAPPO | `MAPPO` | `configs/attention_mappo/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/attention_mappo_highway/` |
+| CommNet | `COMMNET` | `configs/commnet/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/commnet_highway/` |
+| IC3Net | `IC3NET` | `configs/ic3net/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/ic3net_highway/` |
+| CA-ComMAPPO | `CA_COMMAPPO` | `configs/ca_commappo/intersection-multi-agent-v1.yaml` | `--smoke` | `runs/ca_commappo_highway/` |
+| 通信消融 (c) 无冲突先验 | `CA_COMMAPPO` | `configs/ca_commappo/intersection-multi-agent-v1-no-prior.yaml` | 正式配置加 `--smoke` | `runs/ca_commappo_no_prior_highway/` |
 
 > **MAAC 与 MADDPG 按论文 `thesis-planning.md`「可选」标记有意暂缓**：MADDPG 不适合离散动作主线；MAAC attention critic 可后续补作对照。本 runbook 不含二者。
 
 ## 2. 本地 smoke 验证（每个算法、每次远端前）
 
 ```bash
-uv run python main.py mappo --config <algo>/intersection-multi-agent-v1-smoke.yaml --mode train --no-save
+uv run python main.py mappo --config <algo>/intersection-multi-agent-v1.yaml --smoke --mode train --no-save
 ```
 
 对 CommNet/IC3Net/CA-ComMAPPO（任何 `action()` 依赖 `info` 或 RNN/通信的算法），**额外跑一次 test**（train smoke 不暴露 eval 路径问题）：
 
 ```bash
 # 先用 benchmark 产 best_model，再 test
-uv run python main.py mappo --config <algo>/<...>-smoke.yaml --mode benchmark
-uv run python main.py mappo --config <algo>/<...>-smoke.yaml --mode test \
+uv run python main.py mappo --config <algo>/<...>.yaml --smoke --mode benchmark
+uv run python main.py mappo --config <algo>/<...>.yaml --smoke --mode test \
   --model-dir-load runs/<output_dir>/<benchmark_run>/models/best_model.pth --test-episode 1
 ```
 
@@ -143,7 +143,7 @@ uv run python -m ca_commappo.evaluation.plot_results \
 
 ## 9. 已知陷阱
 
-1. `config_path_for` 大小写敏感：Linux 远端 `configs/MAPPO/` 不存在（实际小写 `configs/mappo/`）→ 始终传 `--config`。
+1. 省略 `--config` 时只会选择默认 MAPPO；运行其他算法必须显式传对应算法 YAML。
 2. CommNet/IC3Net 必须 `use_rnn: true` + `Basic_RNN` + `comm_passes`；IC3Net `gate_hidden_size` 必须是 **list**（`[16]`，非标量）。
 3. CommNet/IC3Net `action()` 需 `info`——本项目已运行时打补丁（`comm_runtime_patch.py`）；仍需额外跑 `--mode test` 验证。
 4. CommNet `run_episodes()` 不调 `callback.on_train_episode_info`——训练期 highway 指标以 eval 期为准。

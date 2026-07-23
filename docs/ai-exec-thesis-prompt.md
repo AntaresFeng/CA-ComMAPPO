@@ -50,7 +50,7 @@
 ### 0.5 配置规则
 
 - 所有 highway-env 选项通过 `highway_config` 传入；`observation` / `action` 嵌套字典由适配器 `build_intersection_config()` 与默认值**深度合并**（highway-env 1.11 是浅 update，见 `docs/highway_config_update_bug.md`）。
-- 配置目录约定 `configs/<agent>/`，每算法配两份：正式 YAML + `-smoke.yaml`。smoke 配置用于本地极短训练验证可用性。
+- 配置由 `configs/common.yaml`、`configs/highway/<env-id>.yaml` 和 `configs/<agent>/<env-id>.yaml` 合并；smoke 通过同一配置加 `--smoke` 动态覆盖运行规模。
 - 算法由 YAML 的 `agent` 字段选择（**不是** `main.py` 的子命令名）。`main.py` 的子命令只负责路由到训练模块；即使子命令叫 `mappo`，只要 `--config` 指向的 YAML 里 `agent: "CA_COMMAPPO"`，就会构造 CA-ComMAPPO（前提是 `AGENT_REGISTRY` 里有该键）。
 
 ### 0.6 可复现性
@@ -68,9 +68,9 @@
 
 - `AGENT_REGISTRY`（第 46-49 行）：`{"IPPO": IPPO_Agents, "MAPPO": MAPPO_Agents}`，二者从 `xuance.torch.agents` 导入（第 10 行）。**新增算法 = 往这里加一行键值**。`get_agent_class()`（52-55）查表，未知键抛 `ValueError`。
 - `run()`（384-406）执行顺序：`prepare_run_directory`（385）→ `patch_xuance_marl_buffer_aliases()`（386）→ `set_seed`（387）→ `make_envs`（388）→ `HighwayMetricsCallback()`（391）→ `get_agent_class(configs.agent)`（392）→ `agent_class(config, envs, callback)`（393）。**自定义 XuanCe 组件的运行时注册必须在 392 行之前完成**——建议在 `patch_xuance_marl_buffer_aliases()` 旁边加一个 `register_ca_commappo_components()` 调用。
-- `main()`（409-423）：默认 `agent="MAPPO"`（**硬编码字面量，大写**）；**只有传 `--config` 时**才会读 YAML 的 `agent` key（416-418），此时 `config_path_for()` 根本不会被调用。**未传 `--config` 时**，`config_path_for()` 用硬编码的 `"MAPPO"` 去找 `configs/MAPPO/<env_id>.yaml`——该目录不存在（实际是小写 `configs/mappo/`），会抛 `FileNotFoundError`。因此本项目惯例是**始终显式传 `--config`**；新算法的 config 目录名可自由选择（推荐 `configs/ca_commappo/`、`configs/attention_mappo/`、`configs/commnet/`、`configs/ic3net/`）。
+- `main()` 默认加载 MAPPO；显式 `--config` 用来选择其他算法或消融配置。通用加载逻辑位于 `ca_commappo/config.py`。
 - 模式：`--mode {train,test,benchmark}`。`benchmark` 会用 `EVAL_ENV_SEED_OFFSET = seed + 10000`（第 44 行）建独立 test envs 并交替 train/eval、按 best-key 存 `best_model.pth`。`test` 加载模型后跑 `evaluate_highway_policy` 并可选 `--record-video`。
-- `cli_overrides()`（160-181）构建 CLI 覆盖字典（仅含非 None 项）；实际的 deep-merge 在 `load_configs()`（144-157）用 `xuance.common.recursive_dict_update` 完成。注意**没有 `--logger` 覆盖**，logger 只能由 YAML 决定。
+- `cli_overrides()` 构建 CLI 覆盖字典（仅含非 None 项）；合并顺序为 common → highway → algorithm → smoke → CLI，因此显式 CLI 参数优先级最高。
 
 ### 1.2 XuanCe 四个 torch 注册表（均由 `xuance/torch/__init__.py` 重导出）
 
@@ -127,9 +127,9 @@ class Basic_MLP(Module):
 - 共享/中心化：`use_parameter_sharing: true`、`use_actions_mask: false`、`use_global_state: true`（MAPPO）/`false`（IPPO）。
 - 网络尺寸：`representation_hidden_size: [128,128]`、`actor_hidden_size: [128,128]`、`critic_hidden_size: [128,128]`、`activation: "relu"`、`normalize: "LayerNorm"`、`initialize: "orthogonal"`、`fc_hidden_sizes: [64,64,64]`、`recurrent_hidden_size: 64`、`use_rnn: false`、`flatten_observations: true`。
 - 优化/rollout：`seed: 1`、`parallels: 16`、`buffer_size: 2048`、`n_epochs: 2`、`n_minibatch: 2`、`learning_rate: 0.0003`、`running_steps: 1000000`、`eval_interval: 10000`、`test_episode: 5`、`gamma: 0.99`、`gae_lambda: 0.95`、`clip_range: 0.2`、`vf_coef: 0.5`、`ent_coef: 0.01`、`use_value_norm: true`、`use_gae: true`、`use_grad_clip: true`、`grad_clip_norm: 10.0`。
-- `highway_config`：`controlled_vehicles: 2`、`duration: 20`、`initial_vehicle_count: 10`、`spawn_probability: 0.6`、`collision_reward: -10`、`high_speed_reward: 0.5`、`reward_speed_range: [5.0,9.0]`、`arrived_reward: 5`；`observation` = `MultiAgentObservation` + `Kinematics`，`features: [presence,x,y,vx,vy,cos_h,sin_h]`、`vehicles_count: 15`、`absolute: false`；`action` = `MultiAgentAction` + `DiscreteMetaAction`，`target_speeds: [0,4.5,9]`。
-- 派生形状：每 agent flatten obs = `15 * 7 = 105` 维；`state_space` = `2 * 105 = 210` 维（2 个受控车）。
-- smoke 配置（`-smoke.yaml`）：`logger: "tensorboard"`（本地无需 wandb 登录；MAPPO/IPPO 的 smoke 均已对齐为 tensorboard）、`vectorize: "DummyVecMultiAgentEnv"`、隐藏层 `[64,64]`、`parallels: 1`、`buffer_size: 8`、`n_epochs: 1`、`n_minibatch: 1`、`running_steps: 16`、`eval_interval: 16`、`test_episode: 1`、`controlled_vehicles: 3`、`duration: 13`。**注意**：正式配置（`intersection-multi-agent-v1.yaml`）用 `logger: "wandb"`，远端训练前需 `wandb login`（或设 `WANDB_MODE=offline`）；本地 smoke 用 tensorboard 不受影响。
+- `highway_config` 单独位于 `configs/highway/intersection-multi-agent-v1.yaml`：`controlled_vehicles: 3`、`duration: 20`、`initial_vehicle_count: 10`、`spawn_probability: 0.6`、`collision_reward: -10`、`high_speed_reward: 0.5`、`reward_speed_range: [5.0,9.0]`、`arrived_reward: 5`。
+- 派生形状：每 agent flatten obs = `15 * 7 = 105` 维；`state_space` = `3 * 105 = 315` 维（3 个受控车）。
+- smoke 通过 `--smoke` 动态生成：切换 tensorboard / dummy vectorizer，并缩小隐藏层、并行数、buffer、epoch 和步数；highway 环境配置与正式实验完全相同。
 - 训练/验证入口见 `docs/mappo_model_evaluation_and_video.md`：`uv run python main.py mappo --config <cfg> --mode {train,test,benchmark}`；直接调模块 `uv run python -m ca_commappo.training.train_highway_intersection --config <cfg> --mode test`。
 
 ### 1.6 视频录制（对新算法的已知限制）
@@ -160,7 +160,7 @@ class Basic_MLP(Module):
 1. 通读：`AGENTS.md`、`docs/thesis-planning.md`、`docs/highway_intersection_notes.md`、`docs/sanity_baselines.md`、`docs/mappo_model_evaluation_and_video.md`、`docs/highway_config_update_bug.md`。
 2. 通读本提示词 §1 的所有文件与行号，确认符号仍在。
 3. 复述 reward 契约、9-key 指标、best-key、eval 产物 schema、run 目录布局——确认理解一致后再开工。
-4. 跑一次现有 smoke 确认基线可用：`uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save`。
+4. 跑一次现有 smoke 确认基线可用：`uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save`。
 
 ### 阶段 1 · Attention-MAPPO（强结构基线，解决车辆顺序敏感）
 
@@ -176,9 +176,9 @@ class Basic_MLP(Module):
    - `self.output_shapes = {'state': (hidden_sizes[-1],)}`。
    - 论文公式（见附录 A）：`e_ij = φ(o_i, o_j)`、`z_i = AttnPool({e_ij})`。
 3. **运行时注册**：在 `registration.py` 写 `register_components()`，内含 `REGISTRY_Representation["PermutationInvariantAttention"] = PermutationInvariantAttention`（从 `xuance.torch.representations` 导入注册表）。在 `train_highway_intersection.py` 的 `run()` 里、`get_agent_class` 之前调用（与 `patch_xuance_marl_buffer_aliases()` 并列）。
-4. **配置**：复制 `configs/mappo/intersection-multi-agent-v1.yaml` → `configs/attention_mappo/intersection-multi-agent-v1.yaml`，把 `representation: "Basic_MLP"` 改成 `"PermutationInvariantAttention"`，`output_dir` 改 `runs/attention_mappo_highway/`，其余与 MAPPO 一致（保证可比性）。同步建 `...-smoke.yaml`。
+4. **配置**：新增极小算法 YAML，只写 `representation`、`output_dir` 等算法差异；通用、环境和 smoke 参数由加载器提供。
 5. **测试（TDD）**：在 `tests/` 新增 `test_permutation_invariant_representation.py`，断言：(a) 同一场景打乱车辆顺序，`forward` 输出不变（permutation-invariance，数值容差内）；(b) `output_shapes` 正确；(c) `presence==0` 的车被 mask。用确定性 seed，`finally` 关闭资源。
-6. **冒烟**：`uv run python main.py mappo --config configs/attention_mappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save` 跑通且不报维度错。
+6. **冒烟**：`uv run python main.py mappo --config configs/attention_mappo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save` 跑通且不报维度错。
 7. **门禁**：`uv run pytest -q tests/test_permutation_invariant_representation.py -q` 全绿 + smoke 跑通。
 
 ### 阶段 2 · CommNet / IC3Net 通信基线（复用 XuanCe）
@@ -214,7 +214,7 @@ class Basic_MLP(Module):
 5. **配置** `configs/ca_commappo/intersection-multi-agent-v1.yaml`（+ smoke）：`agent: "CA_COMMAPPO"`、`learner: "CA_ComMAPPO_Learner"`、`policy: "CA_ComMAPPO_Policy"`、`representation: "PermutationInvariantAttention"`、`output_dir: "runs/ca_commappo_highway/"`。其余超参与 MAPPO 对齐。
 6. **视频前缀参数化**：按 §1.6 列举的所有 `mappo_test` 站点（`:23,24,93,198,245,254`）统一由 `configs.agent` 派生单一 `name_prefix`（CA-ComMAPPO 用 `ca_commappo_test`）；MAPPO 保持 `mappo_test`，并同步更新 `tests/test_mappo_video_recorder.py`。
 7. **测试（TDD）**：新增 `tests/test_ca_commappo_*.py`：通信模块的 attention 权重对 mask 正确归一化、`b_ij` 单调性、forward 形状；agent 能在 highway smoke 配置下完成构造与一步前向。
-8. **冒烟**：`uv run python main.py mappo --config configs/ca_commappo/intersection-multi-agent-v1-smoke.yaml --mode train --no-save` 跑通。
+8. **冒烟**：`uv run python main.py mappo --config configs/ca_commappo/intersection-multi-agent-v1.yaml --smoke --mode train --no-save` 跑通。
 9. **门禁**：新测试全绿 + smoke 跑通 + 现有测试仍全绿。
 
 ### 阶段 4 · 实验矩阵 + runbook（多 seed、泛化、顺序扰动、通信消融、可视化）
@@ -252,7 +252,7 @@ class Basic_MLP(Module):
 
 - 代码风格：`ruff check --fix; ruff format`。
 - 测试：`uv run pytest -q`（改动核心逻辑或准备提交时）；新测试单独 `uv run pytest -q tests/<新测试>.py`。
-- smoke 训练：用该阶段 `-smoke.yaml` 跑 `--mode train --no-save`，确认不报错、能完成构造与前向/反向。
+- smoke 训练：用该阶段正式 YAML 加 `--smoke --mode train --no-save`，确认不报错、能完成构造与前向/反向。
 - 仅当门禁全绿才提交。提交信息用 Conventional Commit；提交说明里记录跑了哪些命令。
 
 ---
@@ -271,7 +271,7 @@ class Basic_MLP(Module):
 ## 6. 已知陷阱清单
 
 1. **不要编辑 `.venv` 里的 xuance**——用运行时注册（`xuance_compat.py` 同款）。
-2. **`config_path_for` 大小写敏感**且仅是 fallback；始终用 `--config` 显式传路径。
+2. 省略 `--config` 只选择默认 MAPPO；其他算法必须显式传对应 YAML。
 3. **CommNet/IC3Net 必须 `use_rnn: true` + `Basic_RNN`**（非可选），且 `action()` 需 `info`——见 §1.4 与阶段 2 的运行时补丁。`--mode train` smoke 不暴露此问题，必须额外跑 `--mode test`。
 4. **`MAPPO_Agents._build_policy` 限制 policy 字符串**——CA-ComMAPPO 要继承并重写，或注册新 policy 并放宽检查。
 5. **视频前缀 `mappo_test` 硬编码**——新算法需参数化，否则误导。

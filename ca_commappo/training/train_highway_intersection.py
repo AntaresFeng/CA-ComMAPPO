@@ -5,7 +5,6 @@ from typing import Any
 
 import numpy as np
 import wandb
-from xuance.common import load_yaml, recursive_dict_update
 from xuance.environment import make_envs
 from xuance.torch.agents import IPPO_Agents, MAPPO_Agents, CommNet_Agents, IC3Net_Agents
 from xuance.torch.utils.operations import set_seed
@@ -13,13 +12,12 @@ from xuance.torch.utils.operations import set_seed
 from ca_commappo.algorithms import register_components
 from ca_commappo.algorithms.ca_commappo_agents import CA_ComMAPPO_Agents
 from ca_commappo.algorithms.comm_runtime_patch import patch_comm_agents_info
+from ca_commappo.config import load_configs as load_project_configs
 from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     register_highway_intersection_env,
 )
 
-# Ensure environment is registered in main process and subprocesses
-register_highway_intersection_env()
 from ca_commappo.evaluation.highway_metrics import print_highway_summary
 from ca_commappo.evaluation.mappo_highway_metrics import (
     HighwayMetricsCallback,
@@ -42,8 +40,10 @@ from ca_commappo.training.mappo_run_layout import (
 )
 from ca_commappo.xuance_compat import patch_xuance_marl_buffer_aliases
 
+# Ensure environment is registered in main process and subprocesses.
+register_highway_intersection_env()
 
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
+
 EVAL_ENV_SEED_OFFSET = 10_000
 
 AGENT_REGISTRY = {
@@ -71,6 +71,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default="",
         help="Optional YAML config path. Empty value uses the built-in --env-id config.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Apply the shared fast smoke-test overrides to the selected config.",
     )
     parser.add_argument(
         "--mode",
@@ -140,27 +145,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def config_path_for(env_id: str, agent: str) -> Path:
-    path = CONFIG_DIR / agent / f"{env_id}.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"Unknown highway {agent} config: {path}")
-    return path
-
-
 def load_configs(
     env_id: str = DEFAULT_HIGHWAY_ENV_ID,
     overrides: dict[str, Any] | None = None,
     config_path: str = "",
     agent: str = "MAPPO",
+    smoke: bool = False,
 ) -> argparse.Namespace:
-    path = Path(config_path) if config_path else config_path_for(env_id, agent)
-    if config_path and not path.exists():
-        raise FileNotFoundError(f"Unknown highway {agent} config: {path}")
-    config_dict = load_yaml(file_dir=str(path))
-    if overrides:
-        config_dict = recursive_dict_update(config_dict, overrides)
-    config_dict["config_path"] = str(path)
-    return argparse.Namespace(**config_dict)
+    return load_project_configs(
+        env_id,
+        config_path=config_path,
+        agent=agent,
+        smoke=smoke,
+        overrides=overrides,
+    )
 
 
 def cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
@@ -419,13 +417,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.record_video and args.mode != "test":
         parser.error("--record-video is only supported with --mode test")
-    # Determine agent from config file first if provided, otherwise use default
-    agent = "MAPPO"  # default
-    if args.config:
-        config_dict = load_yaml(file_dir=args.config)
-        agent = config_dict.get("agent", agent)
     configs = load_configs(
-        args.env_id, cli_overrides(args), config_path=args.config, agent=agent
+        args.env_id,
+        cli_overrides(args),
+        config_path=args.config,
+        smoke=args.smoke,
     )
     run(configs, mode=args.mode, save_model=not args.no_save)
     return 0

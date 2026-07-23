@@ -464,18 +464,9 @@ def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
     mappo_training.test(configs, agent, envs=object())
 
 
-def test_load_configs_stores_config_path(tmp_path, monkeypatch):
+def test_load_configs_stores_config_path(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("{}", encoding="utf-8")
-
-    monkeypatch.setattr(
-        mappo_training,
-        "load_yaml",
-        lambda file_dir: {
-            "env_name": "HighwayIntersection",
-            "env_id": "intersection-multi-agent-v1",
-        },
-    )
 
     configs = mappo_training.load_configs(config_path=str(config_path))
 
