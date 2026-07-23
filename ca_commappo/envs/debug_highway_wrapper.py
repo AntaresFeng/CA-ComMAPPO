@@ -30,12 +30,14 @@ class StepData(NamedTuple):
 
 DEFAULT_ENV_ID = DEFAULT_HIGHWAY_ENV_ID
 DEFAULT_HIGHWAY_CONFIG = {
-    "controlled_vehicles": 2,
-    "duration": 15,
-    "spawn_probability": 1.0,
-    "initial_vehicle_count": 20,
+    "controlled_vehicles": 4,
+    "policy_frequency": 5,
+    "duration": 20,
+    "spawn_probability": 0.1,
+    "initial_vehicle_count": 2,
     "arrived_reward": 5,
     "collision_reward": -10,
+    "destination": None,
 }
 
 
@@ -50,7 +52,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --actions '1,1,1'\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
-            "--render-mode human --pause 0.001\n"
+            "--render-mode human --pause 0.01\n"
             "  uv run python -m ca_commappo.envs.debug_highway_wrapper --target wrapper "
             "--seed 7 --print-observations"
         ),
