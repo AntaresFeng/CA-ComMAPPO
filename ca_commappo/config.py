@@ -7,6 +7,8 @@ from xuance.common import load_yaml, recursive_dict_update
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 COMMON_CONFIG_PATH = CONFIG_DIR / "common.yaml"
+TRAINING_ENV_SEED_STRIDE = 1_000_000
+TRAINING_ENV_SEED_SCHEME = "training_seed_times_1000000"
 
 SMOKE_OVERRIDES = {
     "logger": "tensorboard",
@@ -20,8 +22,20 @@ SMOKE_OVERRIDES = {
     "n_minibatch": 1,
     "running_steps": 16,
     "eval_interval": 16,
+    "checkpoint_eval_episodes": 1,
+    "eval_parallels": 1,
     "test_episode": 1,
 }
+
+
+def derive_training_env_seed(training_seed: int) -> int:
+    """Map one training seed to a disjoint vector-environment seed block."""
+
+    if isinstance(training_seed, bool) or not isinstance(training_seed, int):
+        raise ValueError("training seed must be an integer")
+    if training_seed < 0:
+        raise ValueError("training seed must be non-negative")
+    return training_seed * TRAINING_ENV_SEED_STRIDE
 
 
 def config_path_for(env_id: str, agent: str) -> Path:
@@ -64,6 +78,12 @@ def load_configs(
         config = recursive_dict_update(config, SMOKE_OVERRIDES)
     if overrides:
         config = recursive_dict_update(config, overrides)
+
+    # XuanCe assigns vector workers env_seed + rank.  Deriving a large, fixed
+    # block from the training seed prevents seed 1/2/3 runs from sharing almost
+    # all worker seed streams and keeps training disjoint from the reserved
+    # 10k/20k checkpoint/final evaluation cases.
+    config["env_seed"] = derive_training_env_seed(config["seed"])
 
     config["config_path"] = str(algorithm_path)
     config["highway_config_path"] = str(environment_path)

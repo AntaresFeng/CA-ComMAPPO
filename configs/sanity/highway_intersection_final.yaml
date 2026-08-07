@@ -1,0 +1,15 @@
+# Strict, paired final-test protocol shared with learned-policy validation.
+env_name: "HighwayIntersection"
+env_id: "intersection-multi-agent-v1"
+env_seed: 1
+run_seed: 1
+episode_seed_base: 20000
+episode_count: 100
+# The sanity runner is intentionally sequential. Parallelism is execution-only;
+# every policy still receives the exact same explicit episode seed list.
+eval_parallels: 1
+policies: ["random", "idle-only"]
+
+# Reuse the task definition used by MAPPO instead of duplicating a config that
+# could drift. Paths are resolved relative to this file.
+highway_config_path: "../highway/intersection-multi-agent-v1.yaml"

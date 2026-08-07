@@ -1,5 +1,6 @@
 from copy import deepcopy
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator, Sequence
 
 from xuance.common import MultiAgentBaseCallback
 
@@ -44,13 +45,27 @@ def evaluate_highway_policy(
     test_episodes: int,
     phase: str = "eval",
     log_prefix: str | None = "Eval-Highway",
+    deterministic: bool = True,
+    record_once_per_env: bool = False,
+    episode_seeds: Sequence[int] | None = None,
 ) -> dict[str, Any]:
     if test_episodes <= 0:
         raise ValueError("test_episodes must be a positive integer")
 
     num_envs = int(envs.num_envs)
+    if record_once_per_env and test_episodes > num_envs:
+        raise ValueError(
+            "record_once_per_env requires test_episodes <= envs.num_envs"
+        )
+    if episode_seeds is not None:
+        if not record_once_per_env:
+            raise ValueError("episode_seeds requires record_once_per_env=True")
+        if len(episode_seeds) != num_envs:
+            raise ValueError("episode_seeds must contain one seed per environment")
+
     records: list[dict[str, Any]] = []
     scores: list[float] = []
+    completed_envs: set[int] = set()
 
     use_actions_mask = getattr(agents, "use_actions_mask", False)
     use_global_state = getattr(agents, "use_global_state", False)
@@ -62,14 +77,18 @@ def evaluate_highway_policy(
     rnn_hidden_actor, rnn_hidden_critic = _init_rnn_hidden(agents, num_envs, use_rnn)
 
     while len(records) < test_episodes:
-        policy_out = agents.action(
-            obs_dict=obs_dict,
-            state=state,
-            avail_actions_dict=avail_actions,
-            rnn_hidden_actor=rnn_hidden_actor,
-            rnn_hidden_critic=rnn_hidden_critic,
-            test_mode=True,
+        sampling_context = (
+            deterministic_policy_sampling() if deterministic else _null_context()
         )
+        with sampling_context:
+            policy_out = agents.action(
+                obs_dict=obs_dict,
+                state=state,
+                avail_actions_dict=avail_actions,
+                rnn_hidden_actor=rnn_hidden_actor,
+                rnn_hidden_critic=rnn_hidden_critic,
+                test_mode=True,
+            )
         rnn_hidden_actor = policy_out.get("rnn_hidden_actor")
         rnn_hidden_critic = policy_out.get("rnn_hidden_critic")
         next_obs_dict, _rewards_dict, terminated_dict, truncated, infos = envs.step(
@@ -85,17 +104,29 @@ def evaluate_highway_policy(
         for i_env in range(num_envs):
             if len(records) >= test_episodes:
                 break
-            if all(terminated_dict[i_env].values()) or bool(truncated[i_env]):
-                score = _mean_agent_value(infos[i_env]["episode_score"])
-                record = _episode_record_from_info(
-                    info=infos[i_env],
-                    phase=phase,
-                    episode_index=len(records),
-                    truncated=bool(truncated[i_env]),
-                    score=score,
-                )
-                records.append(record)
-                scores.append(score)
+            episode_done = all(terminated_dict[i_env].values()) or bool(
+                truncated[i_env]
+            )
+            if episode_done:
+                should_record = not record_once_per_env or i_env not in completed_envs
+                if should_record:
+                    score = _mean_agent_value(infos[i_env]["episode_score"])
+                    record = _episode_record_from_info(
+                        info=infos[i_env],
+                        phase=phase,
+                        episode_index=len(records),
+                        truncated=bool(truncated[i_env]),
+                        score=score,
+                        seed=(
+                            None
+                            if episode_seeds is None
+                            else int(episode_seeds[i_env])
+                        ),
+                        env_id=i_env,
+                    )
+                    records.append(record)
+                    scores.append(score)
+                    completed_envs.add(i_env)
                 _reset_finished_env_buffers(
                     envs=envs,
                     i_env=i_env,
@@ -137,6 +168,8 @@ def _episode_record_from_info(
     episode_index: int,
     truncated: bool | None = None,
     score: float | None = None,
+    seed: int | None = None,
+    env_id: int | None = None,
 ) -> dict[str, Any]:
     if "crashed" not in info:
         raise KeyError("Episode info is missing per-agent 'crashed' tuple")
@@ -155,9 +188,46 @@ def _episode_record_from_info(
         arrived_agents=info["arrived"],
         truncated=bool(truncated),
         score=score,
+        seed=seed,
+        env_id=env_id,
         waiting_steps=info.get("waiting_steps"),
         dt=info.get("dt"),
     )
+
+
+@contextmanager
+def deterministic_policy_sampling() -> Iterator[None]:
+    """Make XuanCe's ``test_mode`` categorical/Gaussian action path deterministic.
+
+    XuanCe 1.4.3 calls ``stochastic_sample`` even when ``test_mode=True``.  The
+    temporary, process-local patch keeps training rollouts untouched and also
+    prevents benchmark evaluation from advancing the training Torch RNG state.
+    """
+
+    from xuance.torch.utils.distributions import (
+        CategoricalDistribution,
+        DiagGaussianDistribution,
+    )
+
+    distribution_classes = (CategoricalDistribution, DiagGaussianDistribution)
+    originals = {
+        distribution_class: distribution_class.stochastic_sample
+        for distribution_class in distribution_classes
+    }
+    try:
+        for distribution_class in distribution_classes:
+            distribution_class.stochastic_sample = (
+                distribution_class.deterministic_sample
+            )
+        yield
+    finally:
+        for distribution_class, original in originals.items():
+            distribution_class.stochastic_sample = original
+
+
+@contextmanager
+def _null_context() -> Iterator[None]:
+    yield
 
 
 def _summary_sort_key(

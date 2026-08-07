@@ -1,5 +1,6 @@
 import json
 from argparse import Namespace
+from contextlib import contextmanager
 from pathlib import Path
 
 import cv2
@@ -78,6 +79,14 @@ def test_cli_overrides_includes_explicit_record_video():
     assert overrides["record_video"] is True
 
 
+def test_cli_overrides_accepts_tensorboard_logger_for_local_runs():
+    overrides = cli_overrides(
+        build_parser().parse_args(["--logger", "tensorboard"])
+    )
+
+    assert overrides["logger"] == "tensorboard"
+
+
 def test_cli_overrides_includes_explicit_video_output_disables():
     overrides = cli_overrides(
         build_parser().parse_args(["--no-video-contact-sheet", "--no-combined-video"])
@@ -126,6 +135,37 @@ def test_record_video_train_mode_fails_before_loading_configs(monkeypatch):
 
     assert exc_info.value.code == 2
     assert load_configs_called is False
+
+
+def test_single_env_video_action_uses_deterministic_policy_sampling(monkeypatch):
+    state = {"inside_context": False}
+
+    @contextmanager
+    def deterministic_context():
+        state["inside_context"] = True
+        try:
+            yield
+        finally:
+            state["inside_context"] = False
+
+    class Agent:
+        use_global_state = False
+        use_actions_mask = False
+
+        def action(self, **_kwargs):
+            assert state["inside_context"] is True
+            return {"actions": [{"agent_0": 1}]}
+
+    monkeypatch.setattr(
+        video_recorder, "deterministic_policy_sampling", deterministic_context
+    )
+
+    result = video_recorder._agent_action_for_single_env(
+        Agent(), object(), {"agent_0": np.zeros(1)}, None, None
+    )
+
+    assert result["actions"][0]["agent_0"] == 1
+    assert state["inside_context"] is False
 
 
 def _write_tiny_video(path: Path, color: tuple[int, int, int]) -> None:
@@ -205,6 +245,8 @@ class FakeSingleEnv:
         info = {
             "crashed": (False, False),
             "arrived": (self.step_calls >= 2, self.step_calls >= 2),
+            "waiting_steps": (1, 2),
+            "dt": 0.2,
         }
         rewards = {"agent_0": 1.0, "agent_1": 2.0}
         terminated = {
@@ -290,10 +332,15 @@ def test_record_mappo_policy_videos_collects_records_and_summary(tmp_path, monke
         base_seed=100,
         make_contact_sheet=True,
         make_combined_video=True,
+        model_provenance={"checkpoint_sha256": "abc"},
     )
 
     assert result["summary"]["episodes"] == 2
     assert result["summary"]["arrival_rate"] == 1.0
+    assert result["summary"]["mean_travel_time"] == pytest.approx(0.4)
+    assert result["summary"]["mean_throughput"] == pytest.approx(5.0)
+    assert result["summary"]["mean_waiting_time"] == pytest.approx(0.3)
+    assert result["model_provenance"]["checkpoint_sha256"] == "abc"
     assert [record["seed"] for record in result["records"]] == [100, 101]
     assert len(result["video_files"]) == 2
     assert Path(result["summary_path"]).exists()

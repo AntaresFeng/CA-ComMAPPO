@@ -43,12 +43,14 @@ def build_eval_metadata(
     agents: Any,
     mode: str,
     created_at: str | None = None,
+    evaluation_protocol: dict[str, Any] | None = None,
+    model_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     log_dir = getattr(agents, "log_dir", "")
     eval_artifact_paths(log_dir)
     timestamp = created_at or datetime.now().astimezone().isoformat(timespec="seconds")
     config_snapshot = json_safe(vars(configs))
-    return {
+    metadata = {
         "schema_version": SCHEMA_VERSION,
         "created_at": timestamp,
         "mode": mode,
@@ -59,6 +61,11 @@ def build_eval_metadata(
         "logger": json_safe(getattr(configs, "logger", None)),
         "config": config_snapshot,
     }
+    if evaluation_protocol is not None:
+        metadata["evaluation_protocol"] = json_safe(evaluation_protocol)
+    if model_provenance is not None:
+        metadata["model_provenance"] = json_safe(model_provenance)
+    return metadata
 
 
 def write_eval_metadata(metadata: dict[str, Any], log_dir: str | Path) -> Path:
@@ -83,8 +90,10 @@ def build_eval_record(
     is_initial_eval: bool,
     is_best: bool,
     eval_result: dict[str, Any],
+    evaluation_protocol: dict[str, Any] | None = None,
+    model_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    record = {
         "schema_version": SCHEMA_VERSION,
         "mode": mode,
         "phase": phase,
@@ -96,6 +105,11 @@ def build_eval_record(
         "summary": json_safe(eval_result["summary"]),
         "episodes": json_safe(eval_result["episodes"]),
     }
+    if evaluation_protocol is not None:
+        record["evaluation_protocol"] = json_safe(evaluation_protocol)
+    if model_provenance is not None:
+        record["model_provenance"] = json_safe(model_provenance)
+    return record
 
 
 def append_eval_record_jsonl(record: dict[str, Any], log_dir: str | Path) -> Path:

@@ -1,5 +1,9 @@
+import torch
+from xuance.torch.utils.distributions import CategoricalDistribution
+
 from ca_commappo.evaluation.mappo_highway_metrics import (
     HighwayMetricsCallback,
+    deterministic_policy_sampling,
     evaluate_highway_policy,
     is_better_highway_summary,
 )
@@ -118,6 +122,38 @@ def test_is_better_highway_summary_prefers_task_success_then_safety_reward_lengt
     )
 
 
+def test_record_once_per_env_ignores_fast_env_repeats_and_records_seeds():
+    agent = TwoEnvAgent()
+    envs = UnevenTwoEnvVec()
+
+    result = evaluate_highway_policy(
+        agents=agent,
+        envs=envs,
+        test_episodes=2,
+        log_prefix=None,
+        record_once_per_env=True,
+        episode_seeds=[101, 102],
+    )
+
+    assert sorted(record["env_id"] for record in result["episodes"]) == [0, 1]
+    assert sorted(record["seed"] for record in result["episodes"]) == [101, 102]
+    assert len(result["episodes"]) == 2
+
+
+def test_deterministic_sampling_uses_argmax_without_advancing_torch_rng():
+    distribution = CategoricalDistribution(3)
+    distribution.set_param(logits=torch.tensor([[0.0, 3.0, 1.0]]))
+    rng_before = torch.get_rng_state().clone()
+
+    with deterministic_policy_sampling():
+        first = distribution.stochastic_sample()
+        second = distribution.stochastic_sample()
+
+    assert first.item() == 1
+    assert second.item() == 1
+    assert torch.equal(torch.get_rng_state(), rng_before)
+
+
 class FakeAgent:
     agent_keys = ["agent_0", "agent_1"]
     use_actions_mask = False
@@ -173,4 +209,60 @@ class FakeVecEnv:
             [{"agent_0": True, "agent_1": True}],
             [False],
             [info],
+        )
+
+
+class TwoEnvAgent:
+    agent_keys = ["agent_0"]
+    use_actions_mask = False
+    use_global_state = False
+    use_rnn = False
+    current_step = 0
+
+    def action(self, *, obs_dict, **_kwargs):
+        return {
+            "actions": [{"agent_0": 1} for _ in obs_dict],
+            "rnn_hidden_actor": None,
+            "rnn_hidden_critic": None,
+        }
+
+
+class UnevenTwoEnvVec:
+    num_envs = 2
+
+    def __init__(self):
+        self.steps = [0, 0]
+        self.buf_obs = [{"agent_0": 0}, {"agent_0": 0}]
+        self.buf_state = [None, None]
+        self.buf_avail_actions = [None, None]
+
+    def reset(self):
+        return self.buf_obs, [{}, {}]
+
+    def step(self, _actions):
+        self.steps = [step + 1 for step in self.steps]
+        infos = []
+        terminated = []
+        for i_env, step in enumerate(self.steps):
+            done = i_env == 0 or step >= 3
+            terminated.append({"agent_0": done})
+            infos.append(
+                {
+                    "episode_step": step,
+                    "episode_score": {"agent_0": float(i_env + 1)},
+                    "crashed": (False,),
+                    "arrived": (done,),
+                    "reset_obs": {"agent_0": 0},
+                    "reset_state": None,
+                    "reset_avail_actions": None,
+                }
+            )
+            if done:
+                self.steps[i_env] = 0
+        return (
+            [{"agent_0": 0}, {"agent_0": 0}],
+            [{"agent_0": 0.0}, {"agent_0": 0.0}],
+            terminated,
+            [False, False],
+            infos,
         )

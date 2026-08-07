@@ -1,11 +1,14 @@
-from ca_commappo.config import load_configs
+from ca_commappo.config import derive_training_env_seed, load_configs
 from ca_commappo.envs.highway_intersection_wrapper import DEFAULT_HIGHWAY_ENV_ID
+from ca_commappo.training.train_highway_intersection import build_parser, cli_overrides
 
 
 def test_load_configs_composes_common_environment_and_algorithm_layers():
     configs = load_configs(DEFAULT_HIGHWAY_ENV_ID, agent="mappo")
 
     assert configs.agent == "MAPPO"
+    assert configs.seed == 1
+    assert configs.env_seed == 1_000_000
     assert configs.running_steps == 1_000_000
     assert configs.highway_config["controlled_vehicles"] == 4
     assert configs.highway_config["policy_frequency"] == 5
@@ -38,3 +41,28 @@ def test_explicit_overrides_take_precedence_over_smoke():
     )
 
     assert configs.running_steps == 32
+
+
+def test_training_seed_drives_disjoint_environment_seed_block():
+    overrides = cli_overrides(build_parser().parse_args(["--seed", "3"]))
+    configs = load_configs(
+        DEFAULT_HIGHWAY_ENV_ID,
+        agent="mappo",
+        overrides=overrides,
+    )
+
+    assert overrides["seed"] == 3
+    assert "env_seed" not in overrides
+    assert configs.seed == 3
+    assert configs.env_seed == 3_000_000
+    assert configs.env_seed == derive_training_env_seed(configs.seed)
+
+
+def test_training_env_seed_yaml_or_override_cannot_break_seed_mapping():
+    configs = load_configs(
+        DEFAULT_HIGHWAY_ENV_ID,
+        agent="mappo",
+        overrides={"seed": 2, "env_seed": 17},
+    )
+
+    assert configs.env_seed == 2_000_000

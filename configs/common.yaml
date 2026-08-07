@@ -12,7 +12,9 @@ master_port: "12355"
 
 env_name: "HighwayIntersection"
 env_id: "intersection-multi-agent-v1"
-env_seed: 1
+# Training config loading derives env_seed as seed * 1,000,000 so parallel
+# worker seed blocks and reserved evaluation cases do not overlap.
+env_seed: 1000000
 continuous_action: false
 
 rnn: "GRU"
@@ -61,4 +63,8 @@ grad_clip_norm: 10.0
 
 running_steps: 1000000
 eval_interval: 10000
-test_episode: 5
+checkpoint_eval_episodes: 50
+checkpoint_eval_seed: 10000
+final_eval_seed: 20000
+eval_parallels: 10
+test_episode: 100

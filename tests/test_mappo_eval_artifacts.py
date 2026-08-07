@@ -99,6 +99,10 @@ def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):
         running_steps=16,
         eval_interval=16,
         test_episode=1,
+        checkpoint_eval_episodes=1,
+        checkpoint_eval_seed=10_000,
+        final_eval_seed=20_000,
+        eval_parallels=1,
         highway_config={"duration": 13},
         custom_path=Path("models/run"),
         custom_np=np.int64(7),
@@ -302,9 +306,12 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
         parallels=1,
         eval_interval=16,
         test_episode=1,
+        checkpoint_eval_episodes=1,
+        checkpoint_eval_seed=10_000,
+        final_eval_seed=20_000,
+        eval_parallels=1,
     )
     agent = FakeBenchmarkAgent(tmp_path / "benchmark_run")
-    fake_env = FakeBenchmarkEnv()
     eval_results = [
         {
             "scores": [0.1],
@@ -317,17 +324,16 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
             "episodes": [{"episode_index": 0}],
         },
     ]
-    make_envs_configs = []
+    evaluation_calls = []
 
-    def fake_make_envs(configs_test):
-        make_envs_configs.append(configs_test)
-        return fake_env
+    def fake_evaluate_fixed_seed_policy(**kwargs):
+        evaluation_calls.append(kwargs)
+        return eval_results.pop(0)
 
-    monkeypatch.setattr(mappo_training, "make_envs", fake_make_envs)
     monkeypatch.setattr(
         mappo_training,
-        "evaluate_highway_policy",
-        lambda **_kwargs: eval_results.pop(0),
+        "evaluate_fixed_seed_policy",
+        fake_evaluate_fixed_seed_policy,
     )
 
     mappo_training.benchmark(configs, agent, save_model=False)
@@ -350,10 +356,13 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
     assert rows[1]["is_initial_eval"] is False
     assert rows[1]["is_best"] is True
     assert rows[1]["step"] == 16
-    assert len(make_envs_configs) == 1
-    assert make_envs_configs[0].env_seed == configs.seed + 10_000
+    assert len(evaluation_calls) == 2
+    assert all(
+        call["protocol"]["episode_seeds"] == [10_000]
+        for call in evaluation_calls
+    )
     assert configs.env_seed == 21
-    assert fake_env.closed is True
+    assert metadata["evaluation_protocol"]["episode_seeds"] == [10_000]
 
 
 def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypatch):
@@ -366,20 +375,29 @@ def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypat
         parallels=1,
         eval_interval=16,
         test_episode=1,
+        checkpoint_eval_episodes=1,
+        checkpoint_eval_seed=10_000,
+        final_eval_seed=20_000,
+        eval_parallels=1,
     )
     agent = FakeBenchmarkAgent(tmp_path / "benchmark_run")
-    fake_env = FakeBenchmarkEnv()
+    make_envs_called = False
 
     def fail_metadata(*_args, **_kwargs):
         raise RuntimeError("metadata failed")
 
-    monkeypatch.setattr(mappo_training, "make_envs", lambda _configs: fake_env)
+    def fail_if_make_envs_called(_configs):
+        nonlocal make_envs_called
+        make_envs_called = True
+        raise AssertionError("evaluation env must not be allocated before metadata")
+
+    monkeypatch.setattr(mappo_training, "make_envs", fail_if_make_envs_called)
     monkeypatch.setattr(mappo_training, "write_eval_run_metadata", fail_metadata)
 
     with pytest.raises(RuntimeError, match="metadata failed"):
         mappo_training.benchmark(configs, agent, save_model=False)
 
-    assert fake_env.closed is True
+    assert make_envs_called is False
 
 
 def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
@@ -394,9 +412,11 @@ def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
         record_video=True,
         video_episodes=None,
         video_dir=str(tmp_path / "videos"),
-        video_seed=0,
+        video_seed=None,
         video_contact_sheet=True,
         video_combined=True,
+        final_eval_seed=20_000,
+        eval_parallels=2,
     )
     agent = FakeAgent(tmp_path / "test_run")
     calls = []
@@ -407,7 +427,12 @@ def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
     }
 
     monkeypatch.setattr(
-        mappo_training, "evaluate_highway_policy", lambda **_kwargs: result
+        mappo_training, "evaluate_fixed_seed_policy", lambda **_kwargs: result
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "load_model_provenance",
+        lambda **_kwargs: {"verification": "sidecar_sha256_verified"},
     )
     monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
     monkeypatch.setattr(
@@ -429,9 +454,12 @@ def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
     assert calls
     assert calls[0]["model_path"] == "models/best_model.pth"
     assert calls[0]["episode_count"] == 6
-    assert calls[0]["base_seed"] == 0
+    assert calls[0]["base_seed"] == 20_000
     assert calls[0]["make_contact_sheet"] is True
     assert calls[0]["make_combined_video"] is True
+    assert calls[0]["model_provenance"]["verification"] == (
+        "sidecar_sha256_verified"
+    )
 
 
 def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
@@ -443,6 +471,8 @@ def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
         test_episode=1,
         model_dir="models/default",
         record_video=False,
+        final_eval_seed=20_000,
+        eval_parallels=1,
     )
     agent = FakeAgent(tmp_path / "test_run")
     result = {
@@ -452,7 +482,12 @@ def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
     }
 
     monkeypatch.setattr(
-        mappo_training, "evaluate_highway_policy", lambda **_kwargs: result
+        mappo_training, "evaluate_fixed_seed_policy", lambda **_kwargs: result
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "load_model_provenance",
+        lambda **_kwargs: {"verification": "sidecar_sha256_verified"},
     )
     monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
     monkeypatch.setattr(
@@ -471,3 +506,105 @@ def test_load_configs_stores_config_path(tmp_path):
     configs = mappo_training.load_configs(config_path=str(config_path))
 
     assert configs.config_path == str(config_path)
+
+
+def test_benchmark_train_segments_preserve_exact_budget_and_short_tail():
+    configs = Namespace(running_steps=48, parallels=4, eval_interval=20)
+
+    assert mappo_training.benchmark_train_segments(configs) == [5, 5, 2]
+
+
+def test_evaluate_fixed_seed_policy_batches_and_returns_exact_sorted_seed_set(
+    monkeypatch,
+):
+    configs = Namespace(env_seed=1, parallels=16)
+    protocol = mappo_training.fixed_seed_evaluation_protocol(
+        base_seed=100,
+        episode_count=5,
+        parallels=2,
+        purpose="final_test",
+    )
+    envs = []
+    calls = []
+
+    class Env:
+        def __init__(self, env_seed, parallels):
+            self.env_seed = env_seed
+            self.parallels = parallels
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class Agent:
+        current_step = 123
+
+        def __init__(self):
+            self.logs = []
+
+        def log_infos(self, values, step):
+            self.logs.append((values, step))
+
+    def fake_make_envs(batch_configs):
+        env = Env(batch_configs.env_seed, batch_configs.parallels)
+        envs.append(env)
+        return env
+
+    def fake_evaluate_highway_policy(**kwargs):
+        seeds = kwargs["episode_seeds"]
+        calls.append(kwargs)
+        records = []
+        for seed in reversed(seeds):
+            records.append(
+                {
+                    "seed": seed,
+                    "score": float(seed),
+                    "episode_reward": float(seed),
+                    "agent_rewards": {"agent_0": float(seed)},
+                    "steps": 1,
+                    "collision": False,
+                    "arrival": True,
+                    "truncated": False,
+                }
+            )
+        return {"episodes": records}
+
+    monkeypatch.setattr(mappo_training, "make_envs", fake_make_envs)
+    monkeypatch.setattr(
+        mappo_training, "evaluate_highway_policy", fake_evaluate_highway_policy
+    )
+    agent = Agent()
+
+    result = mappo_training.evaluate_fixed_seed_policy(
+        configs=configs,
+        agents=agent,
+        protocol=protocol,
+        phase="test",
+        log_prefix="Test-Highway",
+    )
+
+    assert [record["seed"] for record in result["episodes"]] == list(
+        range(100, 105)
+    )
+    assert [env.env_seed for env in envs] == [100, 102, 104]
+    assert [env.parallels for env in envs] == [2, 2, 1]
+    assert all(env.closed for env in envs)
+    assert all(call["deterministic"] is True for call in calls)
+    assert all(call["record_once_per_env"] is True for call in calls)
+    assert configs.env_seed == 1
+    assert configs.parallels == 16
+    assert agent.logs[0][1] == 123
+
+
+@pytest.mark.parametrize(
+    "configs, message",
+    [
+        (Namespace(running_steps=10, parallels=4, eval_interval=8), "running_steps"),
+        (Namespace(running_steps=16, parallels=4, eval_interval=10), "eval_interval"),
+    ],
+)
+def test_benchmark_train_segments_reject_ambiguous_vector_budgets(
+    configs, message
+):
+    with pytest.raises(ValueError, match=message):
+        mappo_training.benchmark_train_segments(configs)

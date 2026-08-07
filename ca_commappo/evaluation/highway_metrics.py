@@ -29,6 +29,7 @@ def build_episode_record(
     phase: str | None = None,
     policy: str | None = None,
     seed: int | None = None,
+    env_id: int | None = None,
     score: float | None = None,
     waiting_steps: Sequence[float] | None = None,
     dt: float | None = None,
@@ -49,6 +50,8 @@ def build_episode_record(
         record["policy"] = policy
     if seed is not None:
         record["seed"] = int(seed)
+    if env_id is not None:
+        record["env_id"] = int(env_id)
     record.update(
         {
             "episode_index": int(episode_index),

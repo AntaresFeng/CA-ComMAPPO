@@ -17,6 +17,9 @@ from ca_commappo.evaluation.highway_metrics import (
     build_episode_record,
     summarize_episode_records,
 )
+from ca_commappo.evaluation.mappo_highway_metrics import (
+    deterministic_policy_sampling,
+)
 
 DEFAULT_VIDEO_EPISODE_LIMIT = 6
 VIDEO_SUMMARY_FILENAME = "video_eval_summary.json"
@@ -81,7 +84,8 @@ def _agent_action_for_single_env(
         action_kwargs["state"] = [env.state()]
     if getattr(agents, "use_actions_mask", False):
         action_kwargs["avail_actions_dict"] = [env.avail_actions()]
-    return agents.action(**action_kwargs)
+    with deterministic_policy_sampling():
+        return agents.action(**action_kwargs)
 
 
 def _init_single_env_rnn_hidden(agents: Any) -> tuple[Any, Any]:
@@ -191,6 +195,7 @@ def record_mappo_policy_videos(
     base_seed: int,
     make_contact_sheet: bool,
     make_combined_video: bool,
+    model_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if episode_count <= 0:
         raise ValueError("episode_count must be a positive integer")
@@ -264,6 +269,8 @@ def record_mappo_policy_videos(
                     policy=name_prefix,
                     seed=seed,
                     score=_mean_agent_reward(agent_rewards),
+                    waiting_steps=latest_info.get("waiting_steps"),
+                    dt=latest_info.get("dt"),
                 )
             )
     finally:
@@ -305,6 +312,7 @@ def record_mappo_policy_videos(
     payload: dict[str, Any] = {
         "schema_version": 1,
         "model_path": model_path,
+        "model_provenance": json_safe(model_provenance),
         "config_path": getattr(configs, "config_path", ""),
         "base_seed": int(base_seed),
         "requested_video_episodes": int(episode_count),
