@@ -66,3 +66,29 @@ def test_training_env_seed_yaml_or_override_cannot_break_seed_mapping():
     )
 
     assert configs.env_seed == 2_000_000
+
+
+def test_epochs5_iteration_changes_only_epochs_and_output_identity():
+    control = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/intersection-multi-agent-v1-robust-eval.yaml"
+            ),
+        )
+    )
+    iteration = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path="configs/mappo/intersection-multi-agent-v1-epochs5.yaml",
+        )
+    )
+
+    differences = {
+        key
+        for key in control.keys() | iteration.keys()
+        if control.get(key) != iteration.get(key)
+    }
+    assert differences == {"config_path", "n_epochs", "output_dir"}
+    assert control["n_epochs"] == 2
+    assert iteration["n_epochs"] == 5

@@ -242,3 +242,21 @@ Iteration 1 结论：框架/选模修复成功，性能假设失败；当前控�
 KL/clip/ratio 的有效更新幅度增加，固定评估在相同 1M 预算内脱离 `0.20/0.80`
 平台。learning rate、entropy coefficient、网络、buffer、minibatch、环境与奖励均
 保持不变；先 smoke，通过后才启动正式 benchmark。
+
+## Iteration 2：increase PPO epochs
+
+假设：Iteration 1 的末段 clip fraction 几乎为 0、ratio 贴近 1、actor loss 很小，
+说明每批 rollout 的 PPO 更新不足。只把 `n_epochs` 从 2 增加到 5，应提高有效更新
+幅度并使固定 argmax 行为脱离长期 `0.20/0.80` 平台；若完整训练仍无改善，或出现
+KL/clip 过高，则该假设被证伪。
+
+配置：`configs/mappo/intersection-multi-agent-v1-epochs5.yaml`。解析后与 Iteration 1
+只有 `n_epochs: 2 -> 5`、隔离产物所需的 `output_dir` 和 `config_path` 不同。
+
+save-enabled smoke：
+`runs/mappo_epochs5_highway/20260808_030102_264033_benchmark_seed_1/`。命令显式使用
+`--smoke --n-epochs 5`，避免 smoke 默认 epoch=1 掩盖目标改动。16 steps 完成，
+best/final model 和 provenance sidecar 均生成；sidecar 记录 n_epochs=5、
+training env seed=1,000,000、CPU，best checkpoint SHA
+`f888df3932602bd7616d9f4435f3ca0eb59e3676e52c513476cf8846c8ce008d`
+校验一致。TensorBoard diagnostics 的两次 rollout 均为 `update_count=5`，nonfinite=0。

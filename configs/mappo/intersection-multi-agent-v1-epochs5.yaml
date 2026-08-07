@@ -1,0 +1,20 @@
+# Iteration 2: test the single-variable hypothesis that the control run's PPO
+# updates were too weak. Relative to intersection-multi-agent-v1-robust-eval,
+# only n_epochs changes from 2 to 5; all environment, network, optimizer,
+# rollout, evaluation, seed, and training-budget settings remain unchanged.
+agent: "MAPPO"
+learner: "MAPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "Basic_MLP"
+vectorize: "SubprocVecMultiAgentEnv"
+use_rnn: false
+use_global_state: true
+output_dir: "runs/mappo_epochs5_highway/"
+
+n_epochs: 5
+
+checkpoint_eval_episodes: 50
+checkpoint_eval_seed: 10000
+final_eval_seed: 20000
+eval_parallels: 10
+test_episode: 100
