@@ -92,6 +92,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         }
         self.state_space = self._build_state_space()
         self.max_episode_steps = self._max_episode_steps()
+        self._episode_step = 0
         self._last_obs: dict[str, np.ndarray] | None = None
         self._initial_seed = getattr(env_config, "env_seed", None)
         self._has_reset = False
@@ -216,6 +217,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        self._episode_step = 0
         self._waiting_steps = {agent: 0 for agent in self.agents}
         self._remember_obs(obs_dict)
         return obs_dict, {}
@@ -226,6 +228,12 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # intersection-multi-agent-v1's MultiAgentWrapper returns per-agent
         # tuples for reward and terminated directly from step().
         observation, reward, terminated, truncated, info = self.env.step(action_tuple)
+        self._episode_step += 1
+        # highway-env advances time with floating-point increments. At 5 Hz,
+        # 100 * 0.2 can remain just below a 20-second duration, so upstream may
+        # truncate on step 101 even though XuanCe allocates an episode buffer
+        # from the declared 100-step limit. Enforce that public limit exactly.
+        truncated = bool(truncated) or self._episode_step >= self.max_episode_steps
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         raw_rewards = self._tuple_to_agent_dict(reward)
         rewards = self._mask_rewards(raw_rewards, active_before_step)
@@ -272,7 +280,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             for agent in self.agents
         }
         self._remember_obs(obs_dict)
-        return obs_dict, rewards, terminated, bool(truncated), info
+        return obs_dict, rewards, terminated, truncated, info
 
     def state(self):
         if self._last_obs is None:

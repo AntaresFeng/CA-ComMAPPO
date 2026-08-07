@@ -7,7 +7,11 @@ def test_load_configs_composes_common_environment_and_algorithm_layers():
 
     assert configs.agent == "MAPPO"
     assert configs.running_steps == 1_000_000
-    assert configs.highway_config["controlled_vehicles"] == 3
+    assert configs.highway_config["controlled_vehicles"] == 4
+    assert configs.highway_config["policy_frequency"] == 5
+    assert configs.highway_config["initial_vehicle_count"] == 0
+    assert configs.highway_config["spawn_probability"] == 0
+    assert configs.highway_config["destination"] is None
     assert (
         configs.highway_config["observation"]["observation_config"]["vehicles_count"]
         == 15

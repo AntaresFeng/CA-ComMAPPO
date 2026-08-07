@@ -136,6 +136,34 @@ def test_reset_step_and_state_are_xuance_compatible():
         env.close()
 
 
+def test_adapter_enforces_declared_max_episode_steps(monkeypatch):
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            highway_config={
+                "controlled_vehicles": 1,
+                "duration": 0.4,
+                "policy_frequency": 5,
+                "initial_vehicle_count": 0,
+                "spawn_probability": 0,
+            }
+        )
+    )
+
+    try:
+        monkeypatch.setattr(env.env.unwrapped, "_is_truncated", lambda: False)
+        env.reset(seed=0)
+        actions = {agent: 1 for agent in env.agents}
+
+        *_rest, first_truncated, _info = env.step(actions)
+        *_rest, second_truncated, _info = env.step(actions)
+
+        assert env.max_episode_steps == 2
+        assert first_truncated is False
+        assert second_truncated is True
+    finally:
+        env.close()
+
+
 def test_step_info_exposes_speed_waiting_and_dt_for_reporting():
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(highway_config={"controlled_vehicles": 3, "duration": 2})
