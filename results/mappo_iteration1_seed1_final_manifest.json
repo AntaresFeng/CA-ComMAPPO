@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "eval_records": [
+    "runs/mappo_robust_eval_highway/20260808_025334_661367_test_seed_1/eval_records.jsonl",
+    "runs/random_highway/20260807_220901_727594_test_seed_1/eval_records.jsonl",
+    "runs/idle_only_highway/20260807_220901_727594_test_seed_1/eval_records.jsonl"
+  ],
+  "expected_seeds": {
+    "mappo_robust_eval": [1],
+    "random": [1],
+    "idle_only": [1]
+  }
+}

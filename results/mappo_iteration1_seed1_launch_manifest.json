@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "status": "complete_below_fair_enough",
+  "iteration": "framework-corrected-control",
+  "session_name": "mappo-i1-robust-seed1",
+  "launched_at": "2026-08-07T22:48:10+08:00",
+  "benchmark_completed_at": "2026-08-08T02:50:21+08:00",
+  "final_validation_completed_at": "2026-08-08T02:54:48+08:00",
+  "run_directory": "runs/mappo_robust_eval_highway/20260807_224810_780662_benchmark_seed_1/",
+  "wandb_offline_run_directory": "runs/mappo_robust_eval_highway/20260807_224810_780662_benchmark_seed_1/wandb/offline-run-20260807_224813-9isbiq71/",
+  "launch_log": "runs/launch_logs/mappo_i1_robust_seed1.log",
+  "working_directory": "/home/fzx/CA-ComMAPPO",
+  "config_path": "configs/mappo/intersection-multi-agent-v1-robust-eval.yaml",
+  "config_file_sha256": "111ccf839e58cdae689b011d7cd6f0ed54a23ed66f8826792d8f429dfdee2485",
+  "pre_agent_resolved_config_sha256": "b8f3255d55a1f1d2b5970e6b5f26f603cf34b3f3681b0b5314cc8967d5cc8349",
+  "checkpoint_training_contract_sha256": "028324e20a24b8e5bfb6da8dfc1d9587bbff3db6f62ad5ad2c5978af6f7635b5",
+  "runtime_source_sha256": "1707c568e2c7f1f00f2e09469dc7fac260aadf2c79406054e9907309a9e784f9",
+  "git_head": "71f19f3f3090a87a2449984d6a753f608b73ee45",
+  "training_seed": 1,
+  "training_env_seed": 1000000,
+  "training_env_seed_scheme": "training_seed_times_1000000",
+  "training_budget": {
+    "running_steps": 1000000,
+    "parallels": 16,
+    "buffer_size": 2048,
+    "eval_interval": 10000
+  },
+  "checkpoint_selection": {
+    "episode_seed_base": 10000,
+    "episode_count": 50,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "final_test": {
+    "episode_seed_base": 20000,
+    "episode_count": 100,
+    "video_episode_count": 6,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "launch_command": "tmux new-session -d -s mappo-i1-robust-seed1 -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-robust-eval.yaml --mode benchmark --seed 1 2>&1 | tee runs/launch_logs/mappo_i1_robust_seed1.log\"",
+  "environment": {
+    "WANDB_MODE": "offline",
+    "UV_CACHE_DIR": "/tmp/ca-commappo-uv-cache",
+    "MPLCONFIGDIR": "/tmp/ca-commappo-mpl-cache",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "preflight_evidence": {
+    "full_pytest": "194 passed, 2 warnings",
+    "save_enabled_smoke_run": "runs/mappo_robust_eval_highway/20260807_222511_321788_benchmark_seed_1/",
+    "provenance_load_smoke_run": "runs/mappo_robust_eval_highway/20260807_222533_600764_test_seed_1/",
+    "smoke_best_model_sha256": "f920585de965735fcf472791827cda3b5332cd4cce33c62b01f1e486d628f509",
+    "strict_sanity_aggregation": "passed"
+  },
+  "initial_checkpoint_evaluation": {
+    "episodes": 50,
+    "arrival_rate": 0.0,
+    "collision_rate": 0.44,
+    "truncation_rate": 0.56,
+    "mean_episode_reward": 8.451603676265309
+  },
+  "completed_benchmark": {
+    "eval_record_count": 101,
+    "final_epoch": 100,
+    "final_step": 1000000,
+    "final_arrival_rate": 0.2,
+    "final_collision_rate": 0.8,
+    "final_truncation_rate": 0.0,
+    "final_mean_episode_reward": 10.399611679317841,
+    "selected_epoch": 1,
+    "selected_step": 10000,
+    "selected_arrival_rate": 0.2,
+    "selected_collision_rate": 0.74,
+    "selected_truncation_rate": 0.06,
+    "selected_mean_episode_reward": 9.704656425031413,
+    "best_model_sha256": "cc0b605e07e5cd2691f0211d8664e3c0826c350866c39e26a6aa37378fd76835",
+    "final_model_sha256": "bab7f1487cede81df8d90d1f7acbfee314a562c6a15c009fc3f0bbf128481620",
+    "late_fixed_eval_distinct_summary_count_epochs_7_through_100": 1,
+    "log_error_scan_count": 0
+  },
+  "completed_final_validation": {
+    "session_name": "mappo-i1-robust-seed1-final",
+    "run_directory": "runs/mappo_robust_eval_highway/20260808_025334_661367_test_seed_1/",
+    "launch_log": "runs/launch_logs/mappo_i1_robust_seed1_final.log",
+    "episodes": 100,
+    "episode_seed_min": 20000,
+    "episode_seed_max": 20099,
+    "arrival_rate": 0.24,
+    "collision_rate": 0.7,
+    "truncation_rate": 0.06,
+    "mean_episode_reward": 10.239918659121772,
+    "mean_episode_length": 38.34,
+    "eval_metadata_sha256": "4238c24b93b9669953e02f1c66e84a3e8efc4013e78affbd93324fb6c70a6d36",
+    "eval_records_sha256": "93842354e98ec672af67864f4bf3ecdfc71aa13d90f0bde96fe88a1070e65ee9",
+    "video_episode_count": 6,
+    "video_summary_sha256": "b100279bec221bdcdd67976ec9756e93ce319dfa079d05a8b0601bc374036155",
+    "combined_video_sha256": "bddcdc760116e82bd4bbe43525a598fc4ed41f2e930f069eb8558ccffb0a197a",
+    "combined_video_duration_seconds": 29.3,
+    "log_error_scan_count": 0,
+    "strict_aggregation_manifest": "results/mappo_iteration1_seed1_final_manifest.json",
+    "strict_aggregation_csv": "results/mappo_iteration1_seed1_comparison.csv"
+  },
+  "expected_benchmark_artifacts": [
+    "eval_metadata.json",
+    "eval_records.jsonl",
+    "models/best_model.pth",
+    "models/best_model_provenance.json",
+    "models/final_model.pth"
+  ],
+  "notes": [
+    "The worktree is intentionally not represented by git_head alone; runtime_source_sha256 fingerprints main.py, all ca_commappo Python sources, pyproject.toml, and uv.lock.",
+    "The checkpoint training contract adds n_agents and episode_length after environment/agent construction; its hash is the authoritative sidecar value.",
+    "Do not modify runtime-fingerprinted sources between benchmark checkpoint creation and its strict final test.",
+    "This manifest is launch readiness evidence, not a final result and not an aggregation manifest."
+  ]
+}
