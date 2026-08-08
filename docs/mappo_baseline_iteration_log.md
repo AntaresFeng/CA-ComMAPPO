@@ -260,3 +260,67 @@ best/final model 和 provenance sidecar 均生成；sidecar 记录 n_epochs=5、
 training env seed=1,000,000、CPU，best checkpoint SHA
 `f888df3932602bd7616d9f4435f3ca0eb59e3676e52c513476cf8846c8ce008d`
 校验一致。TensorBoard diagnostics 的两次 rollout 均为 `update_count=5`，nonfinite=0。
+
+### Iteration 2 完整结果与复盘
+
+正式 benchmark：tmux `mappo-i2-epochs5-seed1`，
+`runs/mappo_epochs5_highway/20260808_030423_818708_benchmark_seed_1/`。
+`WANDB_MODE=offline`，1M steps，101 条固定评估，日志错误扫描为 0；best/final
+checkpoint 均正常生成。best 为 epoch 11 / 110k，SHA-256
+`511ecfe1b2b1171d55a09b27966f4fc91dc13761b0cd19a61fde6c1412381779`：
+
+| checkpoint | episodes | arrival | collision | truncation | reward |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Iteration 1 best（epoch 1） | 50 | 0.20 | 0.74 | 0.06 | 9.7047 |
+| Iteration 2 best（epoch 11） | 50 | 0.30 | 0.70 | 0.00 | 11.9676 |
+| Iteration 2 final epoch 100 | 50 | 0.24 | 0.76 | 0.00 | 10.9938 |
+
+Iteration 2 的固定曲线确实脱离控制组 epoch 7–100 完全不变的平台；epoch 20–100
+有 65 个不同 summary。但 best 在 110k 后没有再刷新，末段退化到约 `0.24/0.76`。
+
+完整 W&B offline history 含 488 个 rollout diagnostics：
+
+| metric | first 10 mean | last 10 mean | full q05 / q50 / q95 |
+| --- | ---: | ---: | ---: |
+| approx KL | 0.007550 | 0.001625 | 0.000986 / 0.001802 / 0.003695 |
+| clip fraction | 0.10667 | 0.01956 | 0.01142 / 0.02142 / 0.04680 |
+| ratio p05 | 0.8279 | 0.9364 | 0.8659 / 0.9172 / 0.9614 |
+| ratio p95 | 1.1891 | 1.0745 | 1.0418 / 1.0848 / 1.1385 |
+| entropy | 0.8163 | 0.2760 | 0.2643 / 0.3288 / 0.5878 |
+| actor loss | -0.008218 | -0.001488 | -0.004088 / -0.001770 / -0.001023 |
+| critic loss | 0.5045 | 0.2672 | 0.2384 / 0.2848 / 0.3571 |
+| gradient norm | 1.4475 | 0.5812 | 0.4312 / 0.6490 / 1.2597 |
+
+相对 Iteration 1，5 epochs 成功提高 KL、clip fraction、actor-loss 幅度并让策略持续
+移动；最大 minibatch KL 仍为 `0.02658`、最大 gradient norm `6.774`、nonfinite 与
+invalid ratio 均为 0。然而 entropy 从早期 `0.816` 收缩到末段 `0.276`，明显低于
+控制组末段 `0.627`，与 110k 后的性能退化同时出现。
+
+独立 final test：tmux `mappo-i2-epochs5-seed1-final`，
+`runs/mappo_epochs5_highway/20260808_210848_991096_test_seed_1/`。严格加载 best_model，
+固定 seeds `20000..20099`，100 episodes：
+
+| iteration | selection arrival/collision | final arrival | final collision | final truncation | final reward |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1：n_epochs=2 | 0.20 / 0.74 | 0.24 | 0.70 | 0.06 | 10.2399 |
+| 2：n_epochs=5 | 0.30 / 0.70 | 0.25 | 0.75 | 0.00 | 11.1848 |
+
+Iteration 2 final 的 arrival 仅 `+0.01`、collision 反而 `+0.05`，故“只增加 PPO
+epochs 会显著改善最终策略”被否证。selection 与 final 的 arrival/collision 差均为
+0.05，仍没有旧版严重选模失真。6 个视频固定对应 seeds `20000..20005`，逐局记录
+与数值验证一致；合并视频 29.6 秒。关键 SHA-256：
+
+- final `eval_records.jsonl`：
+  `07bb009f48d5fe675c781c0152a6b9bc18db22676e6dc655a18a0859e0353c7f`
+- video summary：
+  `baf15203f4d36c51b33e653ea24b1817c53059056b09e27b21d45549491db626`
+- combined video：
+  `69ea15b2352de5d875c2cfe2aa4ab4c2a46b69eb9d8a48d69179f77c13e2cc89`
+
+显式 `results/mappo_iteration2_seed1_final_manifest.json` 已通过严格聚合。Iteration 2
+仍不满足单 seed 的 `arrival>=0.50 / collision<=0.40`，也没有明显优于 Iteration 1。
+
+下一轮不依据 final seeds 的具体 episode 调参；依据训练期 entropy 曲线提出
+Iteration 3：保留 n_epochs=5，只将 `ent_coef: 0.01 -> 0.03`。可证伪预测是末段
+entropy 不再降到约 0.28，checkpoint 曲线不会在 110k 后持续退化，并在独立协议上
+显著降低 collision；若只维持随机性却不改善固定 argmax 协调，该假设失败。
