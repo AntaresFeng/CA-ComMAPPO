@@ -394,3 +394,20 @@ Iteration 4 的依据来自训练曲线而非 final seed 个案：Iteration 3 �
 进展的学习。下一轮保持全部超参和协议不变，只把 `running_steps: 1M -> 2M`。
 可证伪预测是 1M 之后固定 selection 继续改善并达到至少 `0.50/0.40` 附近；若
 1M–2M 平台化或退化，则“预算不足”假设失败。
+
+## Iteration 4：extend training budget
+
+假设：Iteration 3 的 best 直到 980k 才出现，且高 entropy 避免了早期策略冻结；
+1M budget 可能截断仍在进展的学习。保持网络、优化器、n_epochs=5、ent_coef=0.03、
+rollout 和评估协议不变，只将 `running_steps: 1,000,000 -> 2,000,000`。
+
+配置：`configs/mappo/intersection-multi-agent-v1-epochs5-ent03-2m.yaml`。解析差异
+测试证明相对 Iteration 3 仅 `running_steps`、隔离产物的 `output_dir/config_path`
+不同。
+
+save-enabled smoke：
+`runs/mappo_epochs5_ent03_2m_highway/20260808_235007_515289_benchmark_seed_1/`。
+显式 `--smoke --n-epochs 5 --running-steps 32 --eval-interval 16`，完成两个 exact
+16-step epoch 和 3 次固定评估；best/final/sidecar 完整，best SHA
+`4a336318aa723726d6b1153ac61ec3213c4c81abb7c80df70a76798993a801c3`。
+4 次 rollout 的 update_count 均为 5，nonfinite=0。

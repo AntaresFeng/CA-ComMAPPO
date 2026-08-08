@@ -1,0 +1,21 @@
+# Iteration 4: test whether the entropy-regularized run was still improving
+# when the 1M-step budget ended. Relative to the Iteration 3 config, only
+# running_steps changes from 1,000,000 to 2,000,000.
+agent: "MAPPO"
+learner: "MAPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "Basic_MLP"
+vectorize: "SubprocVecMultiAgentEnv"
+use_rnn: false
+use_global_state: true
+output_dir: "runs/mappo_epochs5_ent03_2m_highway/"
+
+n_epochs: 5
+ent_coef: 0.03
+running_steps: 2000000
+
+checkpoint_eval_episodes: 50
+checkpoint_eval_seed: 10000
+final_eval_seed: 20000
+eval_parallels: 10
+test_episode: 100
