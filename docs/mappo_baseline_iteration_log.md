@@ -341,3 +341,56 @@ save-enabled smoke：
 sidecar 完整。sidecar 记录 n_epochs=5、ent_coef=0.03，best SHA
 `c5564342bd82dbea3ff500ea2892e934b4cc0ab77e82ed7207fcefda1856e977`
 校验一致；两次 rollout 的 update_count 均为 5、nonfinite=0。
+
+### Iteration 3 完整结果与复盘
+
+正式 benchmark：tmux `mappo-i3-epochs5-ent03-seed1`，
+`runs/mappo_epochs5_ent03_highway/20260808_211505_584710_benchmark_seed_1/`。
+1M steps、101 条固定评估、W&B offline 正常结束，日志错误扫描为 0。best 在
+epoch 98 / 980k，selection 为 arrival `0.36`、collision `0.64`、truncation `0`、
+reward `12.9011`；best SHA
+`934f6fa8d8e524492bc1de85da97e89c6f4289562407fd3e6bd835e58b0e8b57`。
+最后 10 次固定评估均值为 arrival `0.298`、collision `0.686`，改善持续到训练末段，
+与 Iteration 2 在 110k 后不再刷新形成对照。
+
+完整 488 次 rollout diagnostics：
+
+| metric | first 10 mean | last 10 mean | full q05 / q50 / q95 |
+| --- | ---: | ---: | ---: |
+| approx KL | 0.007664 | 0.002103 | 0.001625 / 0.003383 / 0.005099 |
+| clip fraction | 0.10043 | 0.01824 | 0.01102 / 0.03326 / 0.06136 |
+| ratio p05 | 0.8346 | 0.9243 | 0.8527 / 0.8894 / 0.9390 |
+| ratio p95 | 1.1881 | 1.0808 | 1.0670 / 1.1239 / 1.1592 |
+| entropy | 0.8157 | 0.6814 | 0.6397 / 0.6813 / 0.7628 |
+| actor loss | -0.008188 | -0.001968 | -0.005180 / -0.003002 / -0.001555 |
+| critic loss | 0.5046 | 0.2756 | 0.2648 / 0.2979 / 0.3528 |
+| gradient norm | 1.4003 | 0.6729 | 0.4841 / 0.6915 / 1.3850 |
+
+entropy 全程最低约 `0.600`，末段 `0.681`，显著高于 Iteration 2 的 `0.276`；同时
+KL/clip 保持有效，最大 minibatch KL `0.02774`、最大 gradient norm `6.776`，
+nonfinite/invalid ratio 均为 0。因此“ent_coef=0.03 可防止策略过早集中”得到支持。
+
+独立 final test：tmux `mappo-i3-epochs5-ent03-seed1-final`，
+`runs/mappo_epochs5_ent03_highway/20260808_234624_477249_test_seed_1/`。固定 seeds
+`20000..20099` 的 100 episodes 为 arrival `0.34`、collision `0.66`、truncation `0`、
+reward `12.5375`。相对 Iteration 2 final：arrival `+0.09`、collision `-0.09`、reward
+`+1.353`；selection 与 final 的 arrival/collision 仅各差 0.02，稳健选模继续成立。
+
+6 个视频对应 seeds `20000..20005`，逐局记录与数值验证一致；合并视频 31.9 秒。
+关键 SHA-256：
+
+- final `eval_records.jsonl`：
+  `1e839d85ddc1ccebac2f1ab0435d482aba7e5b5d5396d06ecf13a4a68cc40a3c`
+- video summary：
+  `e72c9904a6bf8ddb5a2cb61c25e1a66c1571407fde22859575a6f9f470f04999`
+- combined video：
+  `095c2b58426b7281fbe5695269753d630afacd703674bc243f82918705f25936`
+
+显式 `results/mappo_iteration3_seed1_final_manifest.json` 已通过严格聚合。虽然这是
+目前最佳迭代，但仍低于单 seed `0.50/0.40` 门槛，不能进入三 seed 验收阶段。
+
+Iteration 4 的依据来自训练曲线而非 final seed 个案：Iteration 3 的最佳点直到
+980k 才出现，且没有像 Iteration 2 那样早期退化，说明 1M budget 可能截断了仍在
+进展的学习。下一轮保持全部超参和协议不变，只把 `running_steps: 1M -> 2M`。
+可证伪预测是 1M 之后固定 selection 继续改善并达到至少 `0.50/0.40` 附近；若
+1M–2M 平台化或退化，则“预算不足”假设失败。
