@@ -92,3 +92,29 @@ def test_epochs5_iteration_changes_only_epochs_and_output_identity():
     assert differences == {"config_path", "n_epochs", "output_dir"}
     assert control["n_epochs"] == 2
     assert iteration["n_epochs"] == 5
+
+
+def test_entropy_iteration_changes_only_entropy_and_output_identity():
+    control = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path="configs/mappo/intersection-multi-agent-v1-epochs5.yaml",
+        )
+    )
+    iteration = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml"
+            ),
+        )
+    )
+
+    differences = {
+        key
+        for key in control.keys() | iteration.keys()
+        if control.get(key) != iteration.get(key)
+    }
+    assert differences == {"config_path", "ent_coef", "output_dir"}
+    assert control["ent_coef"] == 0.01
+    assert iteration["ent_coef"] == 0.03

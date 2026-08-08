@@ -1,0 +1,21 @@
+# Iteration 3: test whether stronger entropy regularization prevents the
+# epochs5 run's policy concentration and post-110k performance regression.
+# Relative to intersection-multi-agent-v1-epochs5, only ent_coef changes from
+# 0.01 to 0.03; all other training and evaluation settings remain unchanged.
+agent: "MAPPO"
+learner: "MAPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "Basic_MLP"
+vectorize: "SubprocVecMultiAgentEnv"
+use_rnn: false
+use_global_state: true
+output_dir: "runs/mappo_epochs5_ent03_highway/"
+
+n_epochs: 5
+ent_coef: 0.03
+
+checkpoint_eval_episodes: 50
+checkpoint_eval_seed: 10000
+final_eval_seed: 20000
+eval_parallels: 10
+test_episode: 100

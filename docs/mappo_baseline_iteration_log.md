@@ -324,3 +324,20 @@ epochs 会显著改善最终策略”被否证。selection 与 final 的 arrival
 Iteration 3：保留 n_epochs=5，只将 `ent_coef: 0.01 -> 0.03`。可证伪预测是末段
 entropy 不再降到约 0.28，checkpoint 曲线不会在 110k 后持续退化，并在独立协议上
 显著降低 collision；若只维持随机性却不改善固定 argmax 协调，该假设失败。
+
+## Iteration 3：entropy regularization
+
+假设：Iteration 2 的有效 PPO 更新已增强，但 entropy 从约 0.82 降到末段 0.28，且
+best 在 110k 后退化。保持 n_epochs=5，只将 `ent_coef: 0.01 -> 0.03`；若训练期
+entropy 得以维持且固定 argmax 的 collision 显著下降，则支持“过早策略集中阻碍
+协调”的解释。若 entropy 上升但 final 协调不改善，则该解释被否证。
+
+配置：`configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml`。解析差异测试
+证明相对 Iteration 2 仅有 `ent_coef`、隔离产物的 `output_dir` 和 `config_path` 不同。
+
+save-enabled smoke：
+`runs/mappo_epochs5_ent03_highway/20260808_211313_119098_benchmark_seed_1/`。
+命令显式使用 `--smoke --n-epochs 5`；16 steps 完成，best/final checkpoint 与
+sidecar 完整。sidecar 记录 n_epochs=5、ent_coef=0.03，best SHA
+`c5564342bd82dbea3ff500ea2892e934b4cc0ab77e82ed7207fcefda1856e977`
+校验一致；两次 rollout 的 update_count 均为 5、nonfinite=0。
