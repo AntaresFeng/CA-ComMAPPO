@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "benchmark_running",
+  "status": "aborted_sticky_arrival_framework_bug",
   "iteration": "epochs5-ent03-reward-ordering",
   "session_name": "mappo-i5-reward-ordering-seed1",
   "launched_at": "2026-08-10T21:45:49+08:00",
@@ -90,5 +90,26 @@
     "truncation_rate": 0.96,
     "mean_episode_reward": -0.7014980757541894,
     "mean_episode_length": 99.38
+  },
+  "aborted_diagnostic_run": {
+    "stopped_at": "2026-08-10T21:53:36+08:00",
+    "completed_eval_record_count": 9,
+    "last_completed_epoch": 8,
+    "last_completed_step": 80000,
+    "reason": "Per-agent arrival was terminal for the agent mask but info.arrived and global termination used non-sticky instantaneous has_arrived flags.",
+    "selected_epoch": 8,
+    "selected_step": 80000,
+    "selected_arrival_rate": 0.02,
+    "selected_collision_rate": 0.04,
+    "selected_truncation_rate": 0.94,
+    "selected_mean_episode_reward": 4.944625386778409,
+    "stored_mean_agent_arrival_fraction": 0.295,
+    "reward_inferred_ever_arrived_fraction": 0.55,
+    "episodes_with_lost_arrival_flag": 48,
+    "best_model_sha256": "0440ce3b63d8f5bf9e5a224a37177b296b8a3068ea64456900151802d975e969",
+    "eval_records_sha256": "507e9047cc98138481f3464c9fb71b68d629b226d0e48fa582a0d12974059907",
+    "final_model_generated": false,
+    "eligible_for_final_aggregation": false,
+    "artifacts_preserved": true
   }
 }

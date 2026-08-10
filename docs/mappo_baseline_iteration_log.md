@@ -534,3 +534,14 @@ seed 在终局类别、步数和逐 agent 到达/碰撞状态上与 Iteration 3 
 epoch 1 / 10k 首次训练后为 arrival `0`、collision `0.04`、truncation `0.96`、reward
 `-0.7015`；奖励排序已迅速抑制碰撞，但是否能进一步学会通行必须由完整 1M 曲线和
 独立 final test 决定，不能用这个早期 checkpoint 宣称成功。
+
+该 run 在 epoch 8 / 80k 后主动中止并完整保留，不能用于最终聚合。奖励重标定暴露出
+一个此前被高碰撞终局掩盖的 adapter contract 缺陷：agent 首次进入到达区域时收到
+arrival reward 且被永久 mask，但 `info["arrived"]` 与 `global_terminated` 每步重新
+读取瞬时 `has_arrived`。车辆继续仿真并离开判定区域后，已终止 agent 的 arrived 会
+从 true 退回 false。epoch 8 的记录中，终局 mean agent arrival 仅 `0.295`，而利用
+新合同“非碰撞下累计 reward > 2 必然领取过 +10 arrival bonus”可反推出 ever-arrived
+比例为 `0.55`；50 局中 48 局丢失至少一个历史到达标志。best 当时为
+`0.02/0.04/0.94`，但由于终止/指标口径不可靠且没有 final_model，不得解释为正式
+Iteration 5 结果。下一步先把 per-agent arrival 与终止状态改为 episode 内 sticky，
+补充“先后到达也触发全局成功”的回归测试，再从 0 重新 smoke 和正式训练。
