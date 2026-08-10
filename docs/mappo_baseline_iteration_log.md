@@ -464,7 +464,7 @@ final 相对 Iteration 3 为 arrival `-0.03`、collision `+0.02`、reward `-0.23
 “Iteration 3 只是被 1M 预算截断，延长到 2M 会继续改善”的假设被否证。继续增加相同
 训练预算没有证据基础，且当前仍远低于单 seed `0.50/0.40` 门槛。
 
-### 奖励排序诊断与待批准的 Iteration 5
+### 奖励排序诊断与 Iteration 5 决策
 
 Iteration 1–4 的共同失败形态是 collision 长期在 `0.64–0.75`，而 reward 随策略改善
 仍可升到约 `12–13`。源码核验确认当前每个 active agent 的普通步 reward 为
@@ -486,10 +486,41 @@ agent/batch 维聚合损失，这个风险方向仍成立。
 `gamma=0.998` 与 `gae_lambda=0.99` 也有独立的时间尺度依据：5 Hz 下若希望保留每秒
 `0.99/0.95` 的折扣，逐决策步应分别为 `0.99^(1/5)=0.997992` 与
 `0.95^(1/5)=0.989794`。但把奖励、gamma、GAE 同时修改会混淆归因。为遵守单轮最小
-可证伪改动，建议待明确批准后，Iteration 5 先把三项相互依赖的奖励系数作为一个
+可证伪改动，Iteration 5 把三项相互依赖的奖励系数作为一个
 “奖励排序合同”整体变更，保持 Iteration 3 的 1M、n_epochs=5、ent_coef=0.03、
 gamma=0.99、GAE=0.95 和所有评估协议不变。可证伪预测：collision 明显下降；若
 主要转为 truncation，则下一轮再单独校正 5 Hz 的 gamma/GAE 时间尺度。
 
-奖励改动会改变任务定义。当前只完成诊断和候选实验设计，未修改共享环境配置，未
-启动 Iteration 5。
+奖励改动会改变任务定义；2026-08-10 已获得明确批准后才开始实施。
+
+## Iteration 5：correct reward ordering
+
+假设：Iteration 1–4 的高碰撞局部最优主要来自任务奖励排序错误，而不是训练预算、
+PPO 更新强度或数值稳定性。把全时限速度 shaping 压到 arrival bonus 的 10% 以内，
+并使一次 collision penalty 大于其余三个 agent 的 arrival bonus 总和，应显著降低
+固定 argmax 策略的 collision。若 collision 没有明显下降，则该奖励解释被否证；若
+collision 下降但 truncation 大幅上升，则说明奖励排序已修复、后续瓶颈转为长时程
+信用分配。
+
+配置：
+`configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml`。
+相对 Iteration 3，只通过算法配置的 `highway_config` 层覆盖：
+
+- `collision_reward: -10 -> -40`
+- `high_speed_reward: 0.5 -> 0.01`
+- `arrived_reward: 5 -> 10`
+
+三项被预注册为一个不可拆分的奖励排序合同；共享 highway 配置未修改，历史实验仍可
+按原任务配置解析。解析差异测试确认除此合同与隔离产物所需的
+`config_path/output_dir` 外无其他变化；`running_steps=1M`、n_epochs=5、
+ent_coef=0.03、gamma=0.99、GAE=0.95、网络、buffer、seeds 和评估协议全部冻结。
+
+save-enabled smoke：
+`runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_214328_630594_benchmark_seed_1/`。
+显式 `--smoke --n-epochs 5 --running-steps 32 --eval-interval 16`，完成两个 exact
+16-step epoch 和 3 次固定评估；best/final/sidecar 完整。sidecar 记录 CPU、training
+seed 1、env seed 1,000,000 及新奖励合同，best SHA
+`3b63be082e809ee6ecef2be6eb3851c3dcc7aacbdf0e1a65fcdb10dd8a100180` 校验一致。
+4 次 rollout 的 update_count 均为 5，nonfinite=0。初始碰撞 episode 的 mean reward
+为 `-19.797`，说明新合同已在真实环境 rollout 生效，碰撞不再像旧任务那样获得高额
+正回报。全量测试为 `198 passed, 2 warnings`。

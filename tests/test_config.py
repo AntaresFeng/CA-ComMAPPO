@@ -146,3 +146,53 @@ def test_two_million_step_iteration_changes_only_budget_and_output_identity():
     assert differences == {"config_path", "output_dir", "running_steps"}
     assert control["running_steps"] == 1_000_000
     assert iteration["running_steps"] == 2_000_000
+
+
+def test_reward_ordering_iteration_changes_only_coupled_reward_contract():
+    control = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml"
+            ),
+        )
+    )
+    iteration = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/"
+                "intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml"
+            ),
+        )
+    )
+
+    differences = {
+        key
+        for key in control.keys() | iteration.keys()
+        if control.get(key) != iteration.get(key)
+    }
+    assert differences == {"config_path", "highway_config", "output_dir"}
+
+    reward_fields = {
+        "collision_reward": (-10, -40),
+        "high_speed_reward": (0.5, 0.01),
+        "arrived_reward": (5, 10),
+    }
+    environment_differences = {
+        key
+        for key in control["highway_config"].keys()
+        | iteration["highway_config"].keys()
+        if control["highway_config"].get(key)
+        != iteration["highway_config"].get(key)
+    }
+    assert environment_differences == set(reward_fields)
+    for field, (before, after) in reward_fields.items():
+        assert control["highway_config"][field] == before
+        assert iteration["highway_config"][field] == after
+
+    assert iteration["highway_config"]["normalize_reward"] is False
+    assert iteration["highway_config"]["reward_speed_range"] == [5.0, 9.0]
+    assert iteration["running_steps"] == 1_000_000
+    assert iteration["gamma"] == 0.99
+    assert iteration["gae_lambda"] == 0.95
