@@ -565,3 +565,22 @@ episode 中，由 arrival bonus 反推的历史到达 agent 与记录的 sticky 
 证据，但其 per-agent arrival 指标和先后到达终止口径不能与修复后正式结果直接混用；
 严格聚合器也会通过 runtime source hash 拒绝把旧 learned artifact 与新模型并表。
 修复后将先重跑 random/idle-only 固定 100 局基线，再从零重启正式 Iteration 5。
+
+修复后、奖励合同一致的 sanity baseline 已按固定 seeds `20000..20099` 重跑：
+
+| policy | arrival | collision | truncation | mean reward | mean agent arrival |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| random | 0.10 | 0.75 | 0.15 | -12.4574 | 0.2375 |
+| idle-only | 0.17 | 0.83 | 0.00 | -16.1293 | 0.1700 |
+
+artifact 分别为
+`runs/random_highway/20260810_220643_345839_test_seed_1/` 与
+`runs/idle_only_highway/20260810_220643_345839_test_seed_1/`。相对修复前同 seed，random
+有一局从 truncation 改为 arrival（`0.09/0.75/0.16 -> 0.10/0.75/0.15`），直接证明
+sticky arrival 会影响全局成功口径；idle-only 仍为 `0.17/0.83/0`。reward 因任务合同
+改变而转为负值，不应与旧 reward 横向比较。两个 artifact 均包含 100 个连续 episode
+payload、正确奖励快照和固定协议，并通过显式
+`results/sanity_reward_ordering_final_manifest.json` 的严格重算。eval records SHA-256：
+
+- random：`8e0295571b93c8d3a4ead5bc8d138d6002a2e402157e225dcbe02138eec3097a`
+- idle-only：`6c066c45c660ed07e9c1955caa0130b6e55ce9340a51700e0c5e13972393c4ae`
