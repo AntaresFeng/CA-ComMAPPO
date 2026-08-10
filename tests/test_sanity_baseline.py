@@ -30,6 +30,9 @@ from ca_commappo.evaluation.sanity_eval_artifacts import (
 
 
 STRICT_CONFIG = Path("configs/sanity/highway_intersection_final.yaml")
+REWARD_ORDERING_STRICT_CONFIG = Path(
+    "configs/sanity/highway_intersection_reward_ordering_final.yaml"
+)
 
 
 def test_strict_config_reuses_task_config_and_defines_exact_final_seeds():
@@ -71,6 +74,30 @@ def test_strict_config_reuses_task_config_and_defines_exact_final_seeds():
         "parallels": 1,
         "episode_seeds": list(range(20_000, 20_100)),
     }
+
+
+def test_reward_ordering_strict_config_only_overrides_reward_contract():
+    control = load_sanity_config(STRICT_CONFIG)
+    iteration = load_sanity_config(REWARD_ORDERING_STRICT_CONFIG)
+
+    assert iteration.episode_seed_base == control.episode_seed_base == 20_000
+    assert iteration.episode_count == control.episode_count == 100
+    assert iteration.policies == control.policies == ["random", "idle-only"]
+
+    differences = {
+        key
+        for key in control.highway_config.keys() | iteration.highway_config.keys()
+        if control.highway_config.get(key) != iteration.highway_config.get(key)
+    }
+    assert differences == {
+        "collision_reward",
+        "high_speed_reward",
+        "arrived_reward",
+    }
+    assert iteration.highway_config["collision_reward"] == -40
+    assert iteration.highway_config["high_speed_reward"] == 0.01
+    assert iteration.highway_config["arrived_reward"] == 10
+    assert iteration.highway_config["normalize_reward"] is False
 
 
 def test_load_rejects_partial_or_nonsequential_strict_protocol(tmp_path):
