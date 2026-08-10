@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "status": "benchmark_running",
+  "iteration": "epochs5-ent03-reward-ordering-sticky-arrival",
+  "session_name": "mappo-i5-reward-ordering-sticky-seed1",
+  "launched_at": "2026-08-10T22:09:13+08:00",
+  "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/",
+  "wandb_offline_run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/wandb/offline-run-20260810_220915-6pobbkci/",
+  "launch_log": "runs/launch_logs/mappo_i5_reward_ordering_sticky_seed1.log",
+  "working_directory": "/home/fzx/CA-ComMAPPO",
+  "config_path": "configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml",
+  "config_file_sha256": "50da90ac1263fe880cfab6083e0615b1e5074bba90395d991abdb7f5d2d7ca5b",
+  "pre_agent_resolved_config_sha256": "3b8eec2e5504e82e56813c4af44927e06c2597e0ea5af43f44931c7a71fe8592",
+  "checkpoint_training_contract_sha256": "d942c76c83d9a8b58a3100fbf3034182f4b25b3ec705ccd7241c00ca4256d699",
+  "runtime_source_sha256": "dda9ae90dc7e4138194f9520013350e35909870289f61049c32c4e5ffcc49728",
+  "git_head": "f620ca1d5e04fe2c0c20d6b029b9bfb9dece192b",
+  "training_seed": 1,
+  "training_env_seed": 1000000,
+  "training_env_seed_scheme": "training_seed_times_1000000",
+  "supersedes_aborted_manifest": "results/mappo_iteration5_seed1_launch_manifest.json",
+  "coupled_reward_contract_change": {
+    "collision_reward": {
+      "control": -10,
+      "iteration": -40
+    },
+    "high_speed_reward": {
+      "control": 0.5,
+      "iteration": 0.01
+    },
+    "arrived_reward": {
+      "control": 5,
+      "iteration": 10
+    }
+  },
+  "frozen_training_settings": {
+    "running_steps": 1000000,
+    "parallels": 16,
+    "buffer_size": 2048,
+    "n_epochs": 5,
+    "n_minibatch": 2,
+    "eval_interval": 10000,
+    "ent_coef": 0.03,
+    "gamma": 0.99,
+    "gae_lambda": 0.95
+  },
+  "checkpoint_selection": {
+    "episode_seed_base": 10000,
+    "episode_count": 50,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "final_test": {
+    "episode_seed_base": 20000,
+    "episode_count": 100,
+    "video_episode_count": 6,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "launch_command": "tmux new-session -d -s mappo-i5-reward-ordering-sticky-seed1 -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml --mode benchmark --seed 1 2>&1 | tee runs/launch_logs/mappo_i5_reward_ordering_sticky_seed1.log\"",
+  "environment": {
+    "WANDB_MODE": "offline",
+    "UV_CACHE_DIR": "/tmp/ca-commappo-uv-cache",
+    "MPLCONFIGDIR": "/tmp/ca-commappo-mpl-cache",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "preflight_evidence": {
+    "full_pytest": "199 passed, 2 warnings",
+    "ruff": "unavailable: executable not installed",
+    "exact_source_save_enabled_smoke_run": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220841_135410_benchmark_seed_1/",
+    "smoke_exact_epoch_count": 2,
+    "smoke_update_count": 5,
+    "smoke_nonfinite_count": 0,
+    "smoke_best_model_sha256": "3b63be082e809ee6ecef2be6eb3851c3dcc7aacbdf0e1a65fcdb10dd8a100180"
+  },
+  "corrected_sanity_baselines": {
+    "manifest": "results/sanity_reward_ordering_final_manifest.json",
+    "random": {
+      "arrival_rate": 0.10,
+      "collision_rate": 0.75,
+      "truncation_rate": 0.15
+    },
+    "idle_only": {
+      "arrival_rate": 0.17,
+      "collision_rate": 0.83,
+      "truncation_rate": 0.0
+    }
+  },
+  "initial_evaluation_evidence": {
+    "epoch": 0,
+    "step": 0,
+    "arrival_rate": 0.0,
+    "collision_rate": 0.44,
+    "truncation_rate": 0.56,
+    "mean_agent_arrival_fraction": 0.17,
+    "mean_episode_reward": -6.903967926474694,
+    "mean_episode_length": 70.72,
+    "global_outcomes_match_pre_fix_initial_policy": true,
+    "pre_fix_mean_agent_arrival_fraction": 0.07
+  },
+  "first_checkpoint_evidence": {
+    "selected_epoch": 1,
+    "selected_step": 10000,
+    "best_model_sha256": "aae9bf6dd3be9bc4f69759c10e815dbaa311dbacd7185afb9280a582cc76817a",
+    "arrival_rate": 0.0,
+    "collision_rate": 0.04,
+    "truncation_rate": 0.96,
+    "mean_episode_reward": -0.7014980757541894,
+    "mean_episode_length": 99.38
+  }
+}

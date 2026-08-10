@@ -584,3 +584,12 @@ payload、正确奖励快照和固定协议，并通过显式
 
 - random：`8e0295571b93c8d3a4ead5bc8d138d6002a2e402157e225dcbe02138eec3097a`
 - idle-only：`6c066c45c660ed07e9c1955caa0130b6e55ce9340a51700e0c5e13972393c4ae`
+
+修复后的正式 Iteration 5 于 2026-08-10 22:09 从零重启：tmux
+`mappo-i5-reward-ordering-sticky-seed1`，
+`runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/`。
+exact-source smoke、正式 run 与 checkpoint provenance 的 runtime source SHA 均为
+`dda9ae90dc7e4138194f9520013350e35909870289f61049c32c4e5ffcc49728`。
+epoch 0 的 global arrival/collision/truncation、reward 和长度与中止 run 完全相同，
+但 sticky mean agent arrival 从错误的 `0.07` 修正为 `0.17`；epoch 1 仍为
+`0/0.04/0.96`，证明重启保持了奖励训练轨迹的可复现起点，同时修正了报告口径。
