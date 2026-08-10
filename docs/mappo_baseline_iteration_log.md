@@ -545,3 +545,23 @@ arrival reward 且被永久 mask，但 `info["arrived"]` 与 `global_terminated`
 `0.02/0.04/0.94`，但由于终止/指标口径不可靠且没有 final_model，不得解释为正式
 Iteration 5 结果。下一步先把 per-agent arrival 与终止状态改为 episode 内 sticky，
 补充“先后到达也触发全局成功”的回归测试，再从 0 重新 smoke 和正式训练。
+
+框架修复：adapter 现在分别保存 upstream 的瞬时 `current_arrived` / raw terminated，
+以及 episode 内 sticky 的 adapter-facing `arrived` / `agents_terminated`。已经到达的 agent
+持续保持 terminated；任一碰撞仍全局失败，所有 agent 先后到达则立即全局成功。新增
+回归测试模拟 agent 0 在 step 1 到达后离开几何判定区、agent 1 在 step 2 到达，验证
+step 2 正确返回 `(True, True)` 与 global termination。全量测试为
+`199 passed, 2 warnings`。
+
+修复后的 save-enabled 50-episode smoke：
+`runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_215758_263999_benchmark_seed_1/`。
+完成两个 exact epoch、3 次各 50 局固定评估、best/final/sidecar；4 个 rollout 的
+update_count 均为 5、nonfinite=0，best SHA
+`d9120ccaba58707c063398346741d737d821a83bc12e9ceed5c73348eae0275a`。所有非碰撞
+episode 中，由 arrival bonus 反推的历史到达 agent 与记录的 sticky arrived 完全一致，
+丢失标志计数从中止 run 的 48/50 降为 0。
+
+这项修复改变 runtime source contract。Iteration 1–4 的产物继续保留为修复前历史
+证据，但其 per-agent arrival 指标和先后到达终止口径不能与修复后正式结果直接混用；
+严格聚合器也会通过 runtime source hash 拒绝把旧 learned artifact 与新模型并表。
+修复后将先重跑 random/idle-only 固定 100 局基线，再从零重启正式 Iteration 5。

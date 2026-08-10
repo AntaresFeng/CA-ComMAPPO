@@ -411,6 +411,66 @@ def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
         env.close()
 
 
+def test_arrival_and_termination_remain_sticky_when_agents_arrive_sequentially(
+    monkeypatch,
+):
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(highway_config={"controlled_vehicles": 2, "duration": 3})
+    )
+
+    try:
+        observations, _info = env.reset(seed=0)
+        raw_observations = tuple(observations[agent] for agent in env.agents)
+        arrival_sequence = [(True, False), (False, True)]
+        step_state = {"index": 0, "arrived": arrival_sequence[0]}
+        vehicle_indices = {
+            id(vehicle): index
+            for index, vehicle in enumerate(env.env.unwrapped.controlled_vehicles)
+        }
+
+        def fake_step(_actions):
+            arrived = arrival_sequence[step_state["index"]]
+            step_state["arrived"] = arrived
+            step_state["index"] += 1
+            rewards = tuple(10.0 if value else 0.0 for value in arrived)
+            return raw_observations, rewards, arrived, False, {}
+
+        def fake_has_arrived(vehicle):
+            return step_state["arrived"][vehicle_indices[id(vehicle)]]
+
+        monkeypatch.setattr(env.env, "step", fake_step)
+        monkeypatch.setattr(env.env.unwrapped, "has_arrived", fake_has_arrived)
+
+        _obs, rewards, terminated, truncated, info = env.step(
+            {agent: 1 for agent in env.agents}
+        )
+
+        assert rewards == {"agent_0": 10.0, "agent_1": 0.0}
+        assert terminated == {"agent_0": True, "agent_1": False}
+        assert truncated is False
+        assert info["current_arrived"] == (True, False)
+        assert info["arrived"] == (True, False)
+        assert info["raw_agents_terminated"] == (True, False)
+        assert info["agents_terminated"] == (True, False)
+        assert info["global_terminated"] is False
+
+        _obs, rewards, terminated, truncated, info = env.step(
+            {"agent_1": 1}
+        )
+
+        assert rewards == {"agent_0": 0.0, "agent_1": 10.0}
+        assert terminated == {"agent_0": True, "agent_1": True}
+        assert truncated is False
+        assert info["current_arrived"] == (False, True)
+        assert info["arrived"] == (True, True)
+        assert info["raw_agents_terminated"] == (False, True)
+        assert info["agents_terminated"] == (True, True)
+        assert info["global_terminated"] is True
+        assert env.agent_mask() == {"agent_0": False, "agent_1": True}
+    finally:
+        env.close()
+
+
 def test_highway_intersection_env_auto_registers_with_xuance_make_envs():
     assert (
         REGISTRY_MULTI_AGENT_ENV[DEFAULT_ENV_NAME] is HighwayIntersectionMultiAgentEnv

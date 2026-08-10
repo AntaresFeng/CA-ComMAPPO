@@ -98,6 +98,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self._has_reset = False
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        self._arrived_agents = {agent: False for agent in self.agents}
         # Per-agent accumulated low-speed step count for the waiting-time metric
         # (Phase 4). Persisted across steps within an episode, reset on reset().
         self._waiting_steps = {agent: 0 for agent in self.agents}
@@ -217,6 +218,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
+        self._arrived_agents = {agent: False for agent in self.agents}
         self._episode_step = 0
         self._waiting_steps = {agent: 0 for agent in self.agents}
         self._remember_obs(obs_dict)
@@ -237,21 +239,39 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         raw_rewards = self._tuple_to_agent_dict(reward)
         rewards = self._mask_rewards(raw_rewards, active_before_step)
-        terminated = self._tuple_to_agent_dict(terminated)
+        raw_terminated = self._tuple_to_agent_dict(terminated)
 
         # Compute environment-level done signal for XuanCe: any crash or
-        # all agents arrived.  MultiAgentWrapper discarded the upstream
-        # scalar terminated, so we recompute from per-agent state.
+        # all agents arrived. Arrival is an episode-level event: after an agent
+        # crosses the exit threshold it can leave that geometric region while
+        # the other agents continue, but it must remain terminal and count as
+        # arrived. MultiAgentWrapper discarded the upstream scalar terminated,
+        # so recompute the global signal from sticky per-agent state.
         crashed = tuple(bool(v.crashed) for v in self.env.unwrapped.controlled_vehicles)
-        arrived = tuple(
-            self.env.unwrapped.has_arrived(v)
+        current_arrived = tuple(
+            bool(self.env.unwrapped.has_arrived(v))
             for v in self.env.unwrapped.controlled_vehicles
         )
-        info["global_terminated"] = any(crashed) or all(terminated.values())
+        for i, agent in enumerate(self.agents):
+            self._arrived_agents[agent] = (
+                self._arrived_agents[agent] or current_arrived[i]
+            )
+        arrived = tuple(self._arrived_agents[agent] for agent in self.agents)
+        terminated = {
+            agent: not active_before_step[agent] or bool(raw_terminated[agent])
+            for agent in self.agents
+        }
+        info["global_terminated"] = any(crashed) or all(arrived)
         if info["global_terminated"]:
             terminated = {agent: True for agent in self.agents}
         info["raw_agents_rewards"] = tuple(raw_rewards[agent] for agent in self.agents)
         info["agents_rewards"] = tuple(rewards[agent] for agent in self.agents)
+        info["raw_agents_terminated"] = tuple(
+            bool(raw_terminated[agent]) for agent in self.agents
+        )
+        info["agents_terminated"] = tuple(
+            bool(terminated[agent]) for agent in self.agents
+        )
 
         # Upstream info["crashed"] is self.vehicle.crashed, i.e. only
         # controlled_vehicles[0].  In a multi-agent setting this silently
@@ -259,6 +279,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         # Replace it with a per-agent tuple so downstream consumers see the
         # true crash state of every controlled vehicle.
         info["crashed"] = crashed
+        info["current_arrived"] = current_arrived
         info["arrived"] = arrived
         # Phase 4 reporting: per-agent speed (m/s) and accumulated low-speed
         # step count. Only accumulate for agents that were active *before* this
