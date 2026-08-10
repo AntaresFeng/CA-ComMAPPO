@@ -524,3 +524,13 @@ seed 1、env seed 1,000,000 及新奖励合同，best SHA
 4 次 rollout 的 update_count 均为 5，nonfinite=0。初始碰撞 episode 的 mean reward
 为 `-19.797`，说明新合同已在真实环境 rollout 生效，碰撞不再像旧任务那样获得高额
 正回报。全量测试为 `198 passed, 2 warnings`。
+
+正式 benchmark 于 2026-08-10 21:45 启动：tmux
+`mappo-i5-reward-ordering-seed1`，
+`runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_214549_194215_benchmark_seed_1/`。
+命令使用 `--mode benchmark --seed 1` 与 `WANDB_MODE=offline`。epoch 0 的 50 个固定
+seed 在终局类别、步数和逐 agent 到达/碰撞状态上与 Iteration 3 初始策略全部一致，
+只因奖励合同不同而从 reward `8.4516` 重算为 `-6.9040`，排除了初始策略或环境漂移。
+epoch 1 / 10k 首次训练后为 arrival `0`、collision `0.04`、truncation `0.96`、reward
+`-0.7015`；奖励排序已迅速抑制碰撞，但是否能进一步学会通行必须由完整 1M 曲线和
+独立 final test 决定，不能用这个早期 checkpoint 宣称成功。
