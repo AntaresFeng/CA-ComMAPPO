@@ -1,0 +1,7 @@
+algorithm,seeds,arrival_rate_mean,arrival_rate_std,collision_rate_mean,collision_rate_std,truncation_rate_mean,truncation_rate_std,mean_episode_reward_mean,mean_episode_reward_std,mean_agent_reward_mean,mean_agent_reward_std,mean_episode_length_mean,mean_episode_length_std,mean_agent_collision_fraction_mean,mean_agent_collision_fraction_std,mean_agent_arrival_fraction_mean,mean_agent_arrival_fraction_std,mean_throughput_mean,mean_throughput_std,mean_waiting_time_mean,mean_waiting_time_std,mean_travel_time_mean,mean_travel_time_std
+idle_only,1,0.17,,0.83,,0.0,,9.8589085596436,,9.8589085596436,,28.06,,0.4525,,0.17,,0.07157935157398772,,0.0,,5.612,
+mappo_epochs5,1,0.25,0.0,0.75,0.0,0.0,0.0,11.18475708329861,0.0,11.18475708329861,0.0,31.32,0.0,0.39,0.0,0.25,0.0,0.09704928092857401,0.0,0.029000000000000005,0.0,6.264000000000001,0.0
+mappo_epochs5_ent03,1,0.34,0.0,0.66,0.0,0.0,0.0,12.537535151650236,0.0,12.537535151650236,0.0,35.91,0.0,0.34,0.0,0.34,0.0,0.11800640516208881,0.0,0.21450000000000002,0.0,7.182,0.0
+mappo_epochs5_ent03_2m,1,0.31,0.0,0.68,0.0,0.01,0.0,12.301052999346302,0.0,12.301052999346302,0.0,35.49,0.0,0.35,0.0,0.3125,0.0,0.11062617828168736,0.0,0.21200000000000002,0.0,7.098000000000001,0.0
+mappo_robust_eval,1,0.24,0.0,0.7,0.0,0.06,0.0,10.239918659121772,0.0,10.239918659121772,0.0,38.34,0.0,0.3575,0.0,0.2575,0.0,0.0825384829657043,0.0,0.6155,0.0,7.668000000000001,0.0
+random,1,0.09,,0.75,,0.16,,5.817866474456347,,5.817866474456347,,56.23,,0.385,,0.2275,,0.05012992343020562,,0.6925,,11.246000000000002,

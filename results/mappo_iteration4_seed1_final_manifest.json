@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "eval_records": [
+    "runs/mappo_robust_eval_highway/20260808_025334_661367_test_seed_1/eval_records.jsonl",
+    "runs/mappo_epochs5_highway/20260808_210848_991096_test_seed_1/eval_records.jsonl",
+    "runs/mappo_epochs5_ent03_highway/20260808_234624_477249_test_seed_1/eval_records.jsonl",
+    "runs/mappo_epochs5_ent03_2m_highway/20260810_213146_520005_test_seed_1/eval_records.jsonl",
+    "runs/random_highway/20260807_220901_727594_test_seed_1/eval_records.jsonl",
+    "runs/idle_only_highway/20260807_220901_727594_test_seed_1/eval_records.jsonl"
+  ],
+  "expected_seeds": {
+    "mappo_robust_eval": [1],
+    "mappo_epochs5": [1],
+    "mappo_epochs5_ent03": [1],
+    "mappo_epochs5_ent03_2m": [1],
+    "random": [1],
+    "idle_only": [1]
+  }
+}

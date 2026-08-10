@@ -411,3 +411,85 @@ save-enabled smoke：
 16-step epoch 和 3 次固定评估；best/final/sidecar 完整，best SHA
 `4a336318aa723726d6b1153ac61ec3213c4c81abb7c80df70a76798993a801c3`。
 4 次 rollout 的 update_count 均为 5，nonfinite=0。
+
+### Iteration 4 完整结果与复盘
+
+正式 benchmark：tmux `mappo-i4-epochs5-ent03-2m-seed1`，
+`runs/mappo_epochs5_ent03_2m_highway/20260808_235213_111023_benchmark_seed_1/`。
+2M steps、201 条固定评估、W&B offline 正常结束，日志错误扫描为 0。前 1M 的全部
+评估记录（含 episode payload）与 Iteration 3 逐值相同，确认这是可复现的单变量
+预算实验。best 在 epoch 168 / 1.68M，selection 为 arrival `0.36`、collision `0.64`、
+truncation `0`、reward `12.9919`；best SHA
+`44002ff6cf594105b3dbdff38923609debbed47132b1bb6f9867fff0fa723864`。
+
+额外 1M 并未改善任务成功率：Iteration 3 的 best 也是 `0.36/0.64/0`，只有 selection
+reward 增加约 `0.091`。1M 后固定评估均值为 arrival `0.2616`、collision `0.7048`、
+truncation `0.0336`；最终 epoch 200 为 `0.20/0.68/0.12`。分段结果也显示延长阶段
+不是仍在单调学习：
+
+| step window | mean arrival | mean collision | mean truncation | mean reward |
+| --- | ---: | ---: | ---: | ---: |
+| 0.9M–1.0M | 0.2980 | 0.6860 | 0.0160 | 12.197 |
+| 1.0M–1.5M | 0.2596 | 0.7184 | 0.0220 | 11.683 |
+| 1.5M–2.0M | 0.2636 | 0.6912 | 0.0452 | 12.091 |
+
+完整 976 次 rollout diagnostics 均为有限值。第二个 1M 中，前/后 10 次的 approximate
+KL 为 `0.001952 -> 0.001512`，clip fraction 为 `0.01658 -> 0.01091`，entropy 为
+`0.6578 -> 0.6844`，actor-loss 幅度为 `0.001889 -> 0.001439`；最大 minibatch KL
+`0.01346`，最大 gradient norm `1.935`，nonfinite/invalid ratio 均为 0。训练数值健康，
+但额外更新逐渐变弱，不能用崩溃、NaN 或梯度爆炸解释性能停滞。
+
+独立 final test：tmux `mappo-i4-epochs5-ent03-2m-seed1-final`，
+`runs/mappo_epochs5_ent03_2m_highway/20260810_213146_520005_test_seed_1/`。严格加载
+best_model，固定 seeds `20000..20099` 的 100 episodes 为 arrival `0.31`、collision
+`0.68`、truncation `0.01`、reward `12.3011`：
+
+| iteration | training budget | selection arrival/collision | final arrival | final collision | final truncation | final reward |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| 3 | 1M | 0.36 / 0.64 | 0.34 | 0.66 | 0.00 | 12.5375 |
+| 4 | 2M | 0.36 / 0.64 | 0.31 | 0.68 | 0.01 | 12.3011 |
+
+6 个视频对应 seeds `20000..20005`，去除 phase/env_id/policy 记录元数据后与数值验证
+前 6 局逐字段一致；合并视频 31.3 秒。关键 SHA-256：
+
+- final `eval_records.jsonl`：
+  `4408e2ee653fd6462063b781682b6bf9bba9e938f3eb7dccaf1d1965e0a8668f`
+- video summary：
+  `6fbe131e7a61c658499d79b82c0b2769ea8e81401a17e180e3517c2f4f5dedd4`
+- combined video：
+  `0ad47be42c214612c12faf399a0f477928e812dd7701131b75007828984b458a`
+
+显式 `results/mappo_iteration4_seed1_final_manifest.json` 已通过严格聚合。Iteration 4
+final 相对 Iteration 3 为 arrival `-0.03`、collision `+0.02`、reward `-0.2365`；因此
+“Iteration 3 只是被 1M 预算截断，延长到 2M 会继续改善”的假设被否证。继续增加相同
+训练预算没有证据基础，且当前仍远低于单 seed `0.50/0.40` 门槛。
+
+### 奖励排序诊断与待批准的 Iteration 5
+
+Iteration 1–4 的共同失败形态是 collision 长期在 `0.64–0.75`，而 reward 随策略改善
+仍可升到约 `12–13`。源码核验确认当前每个 active agent 的普通步 reward 为
+`-10 * crashed + 0.5 * normalized_speed`；到达步覆盖为 `+5`，环境在任一受控车辆
+碰撞时全局终止。适配器训练返回的是 masked per-agent reward，并非 highway-env 的
+标量团队均值；因此“其余 agent 稀释碰撞”不是环境直接先求平均，但 MAPPO 最终会在
+agent/batch 维聚合损失，这个风险方向仍成立。
+
+在 100 个决策步、`gamma=0.99` 下，按全速上界计算：满时限 discounted speed return
+约 `31.70`，第 100 步到达约 `33.36`，第 100 步碰撞仍约 `+28.00`。这比仅看未折扣
+上界 `50/+5/-10` 更直接地说明当前优化目标排序错误：晚碰撞仍可获得显著正回报，
+而延迟到达也可高于立即到达。
+
+候选奖励合同为 collision `-40`、high-speed `0.01`、arrival `+10`、
+`reward_speed_range=[5,9]`、`normalize_reward=false`。即使第一轮保持 `gamma=0.99`，
+100 步上界也变为 timeout `+0.634`、末步 arrival `+4.328`、末步 collision
+`-14.155`，已经恢复 timeout < arrival 且 collision < 0 的排序。
+
+`gamma=0.998` 与 `gae_lambda=0.99` 也有独立的时间尺度依据：5 Hz 下若希望保留每秒
+`0.99/0.95` 的折扣，逐决策步应分别为 `0.99^(1/5)=0.997992` 与
+`0.95^(1/5)=0.989794`。但把奖励、gamma、GAE 同时修改会混淆归因。为遵守单轮最小
+可证伪改动，建议待明确批准后，Iteration 5 先把三项相互依赖的奖励系数作为一个
+“奖励排序合同”整体变更，保持 Iteration 3 的 1M、n_epochs=5、ent_coef=0.03、
+gamma=0.99、GAE=0.95 和所有评估协议不变。可证伪预测：collision 明显下降；若
+主要转为 truncation，则下一轮再单独校正 5 Hz 的 gamma/GAE 时间尺度。
+
+奖励改动会改变任务定义。当前只完成诊断和候选实验设计，未修改共享环境配置，未
+启动 Iteration 5。
