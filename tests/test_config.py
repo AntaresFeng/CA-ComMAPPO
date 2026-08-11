@@ -196,3 +196,36 @@ def test_reward_ordering_iteration_changes_only_coupled_reward_contract():
     assert iteration["running_steps"] == 1_000_000
     assert iteration["gamma"] == 0.99
     assert iteration["gae_lambda"] == 0.95
+
+
+def test_timescale_iteration_changes_only_coupled_discount_contract():
+    control = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/"
+                "intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml"
+            ),
+        )
+    )
+    iteration = vars(
+        load_configs(
+            DEFAULT_HIGHWAY_ENV_ID,
+            config_path=(
+                "configs/mappo/"
+                "intersection-multi-agent-v1-epochs5-ent03-"
+                "reward-ordering-timescale.yaml"
+            ),
+        )
+    )
+
+    differences = {
+        key
+        for key in control.keys() | iteration.keys()
+        if control.get(key) != iteration.get(key)
+    }
+    assert differences == {"config_path", "gae_lambda", "gamma", "output_dir"}
+    assert control["gamma"] == 0.99
+    assert iteration["gamma"] == 0.998
+    assert control["gae_lambda"] == 0.95
+    assert iteration["gae_lambda"] == 0.99

@@ -652,3 +652,38 @@ Iteration 5 结论：奖励排序假设得到支持，但修复奖励本身不�
 `lambda=0.95` 校正为 `gamma=0.998` / `lambda=0.99`；奖励、训练预算、PPO 更新、网络、
 seed 与选择/final 协议全部保持不变。可证伪预测是 mean agent arrival 保持高位的同时，
 全局 arrival 上升、truncation 下降；若未发生，则长时程折扣不是主要瓶颈。
+
+## Iteration 6：correct 5 Hz discount time scale
+
+假设：Iteration 5 已经学到低碰撞、约 80% agent 到达，但 `gamma=0.99` 和
+`gae_lambda=0.95` 是按每个 0.2 秒决策步应用，导致 20 秒 horizon 末端信号分别只保留
+`0.99^100≈0.366` 和极短的 GAE trace。把它们校正为逐步 `0.998/0.99`（近似原值的
+五次方根）应改善最后一辆车的长时程信用分配，从而在不牺牲低碰撞的情况下提高全局
+arrival、降低 truncation。若独立 final 的 arrival 不高于 Iteration 5 或 collision
+显著反弹，则该假设被否证。
+
+配置：
+`configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering-timescale.yaml`。
+相对 Iteration 5，解析差异测试只允许：
+
+- `gamma: 0.99 -> 0.998`
+- `gae_lambda: 0.95 -> 0.99`
+- 独立的 `config_path` / `output_dir` 产物身份
+
+两项折扣参数被视为同一 5 Hz 时间尺度合同；奖励 `-40/0.01/+10`、1M steps、
+n_epochs=5、n_minibatch=2、ent_coef=0.03、网络、buffer、训练 seed block 和固定
+50/100 局评估协议全部冻结。配置文件 SHA-256 为
+`0f69cdd43079ed73c943bc37e3b3cd53af445a234bc32769431133b470e690f3`。
+
+全量测试 `201 passed, 2 warnings`；ruff 仍因环境未安装 executable 而不可用。
+save-enabled benchmark smoke：
+`runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200634_182704_benchmark_seed_1/`。
+显式 `--smoke --n-epochs 5 --running-steps 32 --eval-interval 16`，完成两个 exact
+epoch、3 次评估、best/final/sidecar。4 个 rollout 的 update_count 均为 5，所有
+nonfinite 计数为 0；sidecar 校验 `gamma=0.998`、GAE `0.99`、CPU、training seed 1
+和 env seed 1,000,000。best SHA-256
+`3b63be082e809ee6ecef2be6eb3851c3dcc7aacbdf0e1a65fcdb10dd8a100180`，final
+`b48e2c38a74bfc97482d8b2733f98a01d914960e0d1b9b5de4334b34d7c79ba4`。smoke 的
+eval metadata / records SHA-256 分别为
+`d0ff22b3b20a70981fe242d8b8cd94396ab08f7d16f8674a11379dfd450d2e4a` /
+`a584638bbfe259581be7c6d5cfc562d3bc41d1fdea3c54a231d23464ea70bf53`。
