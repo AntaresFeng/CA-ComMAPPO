@@ -697,3 +697,32 @@ runtime source SHA 继续为
 50 局为 arrival `0`、collision `0.44`、truncation `0.56`、mean agent arrival
 `0.17`、reward `-6.9040`，与 Iteration 5 初始评估逐项一致；因此正式 run 的初始化、
 环境和奖励轨迹未漂移，后续差异可归因于 gamma/GAE 时间尺度合同。
+
+正式 benchmark 已完成 1M steps 与 101 个固定选择评估点，无异常退出、OOM 或非有限
+数。选择出的 best 为 epoch 96 / 960k：arrival `0.26`、collision `0.36`、truncation
+`0.38`、mean agent arrival `0.58`、reward `-0.7119`；epoch 100 又退化到
+`0/0/1`、mean agent arrival `0.49`。四个 250k 窗口的 arrival 均值依次为
+`0.0080/0.0192/0.0064/0.0208`，全程大多数 checkpoint 仍是零全局成功，epoch 96
+是一次明显但由固定 50 局确认的行为模式切换，并非平稳收敛。
+
+best 的 50 局呈现两个互斥失败模式：13 局全部到达；18 局碰撞，其中 15 局在任何车
+到达前约第 31 步就碰撞；19 局超时，而且 19 局全部恰好是 3/4 辆到达。与相同
+seeds `10000..10049` 的 Iteration 5 best 逐局配对后：I5 的 14 个成功中只有 3 个仍
+成功，7 个变为碰撞、4 个变为超时；I5 的 34 个超时中有 10 个转为成功，但另有 9 个
+转为碰撞。净结果 arrival `14 -> 13` 几乎不变，collision `2 -> 18`，episode 平均
+提前 `26.46` 步结束。这证明更长时间尺度不是单向改善：它让部分原先“三车后等待”
+场景完成，却让另一批原先安全的场景形成早期抢行碰撞。
+
+W&B offline 共 488 条 rollout，每条完整 10 次更新，nonfinite/invalid ratio 均为 0。
+I6 后 10 条 KL `0.001734`、clip fraction `0.011682`，均低于 I5 的
+`0.003156/0.036791`；entropy 却从 I5 后期 `0.8622` 升为 I6 的 `0.9848`。I6 critic
+loss 中位数/最大值 `0.3365/1.4745`，略高于 I5 的 `0.2737/1.0610`，但最大 gradient
+norm 仅 `2.9437`。因此失败不是数值爆炸、熵塌缩或更新漏跑，而是更长 gamma/GAE
+带来更高方差的稀疏终局信用：actor 后期仍高熵但 KL/clip 和 actor update 变弱，最终
+在“早期抢行碰撞”和“安全等待超时”之间切换，未学到对场景鲁棒的让行规则。
+
+benchmark artifact hashes：best
+`e4213f4cc2660ba6ccde73dc11fda0862760903fe86eb15952e8c8a485259af0`，final
+`7d62f8acbfae9002d332931d3822b7a1a41f8bdca558e7ae9a524ce032544bb1`，eval records
+`7fc4dc46f9fae68dfbef709ea62d63917e4bd5dc4ba110a8f6940f0a211771f7`。在独立 final
+100 局完成前，不把选择集结果当作 Iteration 6 最终结论，也不启动后续参数迭代。
