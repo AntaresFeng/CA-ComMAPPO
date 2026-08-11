@@ -593,3 +593,27 @@ exact-source smoke、正式 run 与 checkpoint provenance 的 runtime source SHA
 epoch 0 的 global arrival/collision/truncation、reward 和长度与中止 run 完全相同，
 但 sticky mean agent arrival 从错误的 `0.07` 修正为 `0.17`；epoch 1 仍为
 `0/0.04/0.96`，证明重启保持了奖励训练轨迹的可复现起点，同时修正了报告口径。
+
+正式 benchmark 已完成 1M steps 与 101 个固定选择评估点（epoch 0–100），无
+Traceback、RuntimeError、OOM 或非有限数。最终 epoch 100 为
+`0.18/0.26/0.56`，reward `1.2444`；按预注册 lexicographic 规则选出的 best 是
+epoch 89 / 890k：arrival `0.28`、collision `0.04`、truncation `0.68`、mean agent
+arrival `0.75`、reward `7.0388`。best checkpoint SHA-256 为
+`b1ee3493b7d34a35960e96d5c12791a70e975cea923d5cc6e95da3452cf5697e`，final 为
+`0524456b0451c2d36a34c18385ea1471771c3c99fd22b8a59b2ec89eac184a5e`；选择评估
+records SHA-256 为
+`add835b73b02bccd25a30b8972eeee1310c58ff240c234d28bb5f0d39cb0aa6e`。
+
+曲线并未稳定收敛到 best：最后 10 个评估均值仅 arrival `0.036`、collision
+`0.110`、truncation `0.854`。但奖励排序假设的首要预测得到支持：best collision 从
+Iteration 3 的 `0.64` 降至 `0.04`，代价是 truncation 从 `0` 升至 `0.68`。因此旧
+奖励确实在驱动抢行碰撞，而修复后的主要失败形态已转成“部分车辆到达后其余车辆等待
+至超时”。这还不能用选择集 best 宣称 final 改善，必须用独立 seeds `20000..20099`
+做 100 局验证。
+
+W&B offline 二进制只读检查得到 488 条 rollout diagnostics，每条均完成 10 次更新
+（5 epochs × 2 minibatches），nonfinite 与 invalid ratio 均为 0。approx KL 从前 10
+条均值 `0.006027` 到后 10 条 `0.003156`，clip fraction 从 `0.079289` 到
+`0.036791`，entropy 从 `0.895433` 到 `0.862209`，最大 gradient norm `2.45134`。
+训练更新持续有效且数值稳定，没有冻结、梯度爆炸或策略熵崩塌证据；当前瓶颈更符合
+奖励稀疏后、5 Hz 下 gamma/GAE 时间尺度过短的行为与信用分配问题。
