@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "benchmark_complete_final_validation_pending",
+  "status": "final_validation_running",
   "iteration": "epochs5-ent03-reward-ordering-sticky-arrival",
   "session_name": "mappo-i5-reward-ordering-sticky-seed1",
   "launched_at": "2026-08-10T22:09:13+08:00",
@@ -166,5 +166,20 @@
       "out_of_memory": 0,
       "nan_or_inf": 0
     }
+  },
+  "final_validation_launch": {
+    "session_name": "mappo-i5-reward-ordering-sticky-seed1-final",
+    "launched_at": "2026-08-11T19:59:20+08:00",
+    "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260811_195920_893803_test_seed_1/",
+    "wandb_offline_run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260811_195920_893803_test_seed_1/wandb/offline-run-20260811_195922-pi4eyumg/",
+    "launch_log": "runs/launch_logs/mappo_i5_reward_ordering_sticky_seed1_final.log",
+    "checkpoint_path": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/models/best_model.pth",
+    "checkpoint_sha256": "b1ee3493b7d34a35960e96d5c12791a70e975cea923d5cc6e95da3452cf5697e",
+    "episode_seed_base": 20000,
+    "episode_count": 100,
+    "video_episode_count": 6,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax",
+    "launch_command": "tmux new-session -d -s mappo-i5-reward-ordering-sticky-seed1-final -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml --mode test --seed 1 --model-dir-load runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/models/best_model.pth --test-episode 100 --record-video --video-episodes 6 2>&1 | tee runs/launch_logs/mappo_i5_reward_ordering_sticky_seed1_final.log\""
   }
 }
