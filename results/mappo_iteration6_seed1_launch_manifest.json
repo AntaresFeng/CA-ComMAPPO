@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "final_validation_running",
+  "status": "final_validation_complete_hypothesis_rejected",
   "iteration": "reward-ordering-timescale",
   "session_name": "mappo-i6-timescale-seed1",
   "launched_at": "2026-08-11T20:08:11+08:00",
@@ -168,5 +168,77 @@
     "deterministic_actions": true,
     "action_selection_mode": "deterministic_argmax",
     "launch_command": "tmux new-session -d -s mappo-i6-timescale-seed1-final -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering-timescale.yaml --mode test --seed 1 --model-dir-load runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/models/best_model.pth --test-episode 100 --record-video --video-episodes 6 2>&1 | tee runs/launch_logs/mappo_i6_timescale_seed1_final.log\""
+  },
+  "completed_final_validation": {
+    "completed_at": "2026-08-11T22:52:33+08:00",
+    "episodes": 100,
+    "episode_seed_range": [20000, 20099],
+    "arrival_rate": 0.23,
+    "collision_rate": 0.36,
+    "truncation_rate": 0.41,
+    "mean_episode_reward": -1.0347149429131812,
+    "mean_episode_length": 71.87,
+    "mean_agent_arrival_fraction": 0.5675,
+    "mean_agent_collision_fraction": 0.18,
+    "mean_throughput": 0.1281241453718837,
+    "mean_waiting_time": 3.292,
+    "mean_travel_time": 14.374,
+    "eval_metadata_sha256": "66e6eb5a582fe639621911f7b5d75524e541725140b8f9d2910136dfd8f566e7",
+    "eval_records_sha256": "4e32eb15e74f6355b8f09561e8ce0a410773b71613356b9d8eee8d43e3ba072c",
+    "video_summary_sha256": "539cd56ef72d024af2f9c9c09549bc65ed9ea32c45f11827aa7867c8e1d472fc",
+    "combined_video_sha256": "7736e04544f9abde56971fb4d718c8c5a8f1197e7e9f4100cc19d687c0ab41c0",
+    "contact_sheet_sha256": "246f1c7032d3de4fcd51029c2a35c847678508d1a5890cb4b222b2aa97ad5c93",
+    "actual_video_episode_count": 6,
+    "video_episode_seed_range": [20000, 20005],
+    "video_records_match_numeric_evaluation": true,
+    "all_mp4_files_ffprobe_valid": true,
+    "strict_manifest": "results/mappo_iteration6_seed1_final_manifest.json",
+    "strict_comparison_csv": "results/mappo_iteration6_seed1_final_comparison.csv",
+    "strict_aggregation_passed": true,
+    "failure_breakdown": {
+      "arrival_episodes": 23,
+      "collision_episodes": 36,
+      "truncation_episodes": 41,
+      "collision_with_zero_arrivals": 29,
+      "collision_mean_steps": 31.639,
+      "collision_median_steps": 25,
+      "truncation_with_three_arrivals": 38,
+      "truncation_with_two_arrivals": 3,
+      "truncation_missing_agent_0": 39,
+      "collision_agent_1_agent_2": 30,
+      "collision_agent_0_agent_3": 6
+    },
+    "paired_iteration5_final_transitions": {
+      "i5_arrival_to_i6_arrival": 11,
+      "i5_arrival_to_i6_collision": 13,
+      "i5_arrival_to_i6_truncation": 14,
+      "i5_collision_to_i6_truncation": 1,
+      "i5_truncation_to_i6_arrival": 12,
+      "i5_truncation_to_i6_collision": 23,
+      "i5_truncation_to_i6_truncation": 26,
+      "mean_episode_step_delta": -25.27
+    },
+    "log_error_scan": {
+      "traceback": 0,
+      "runtime_error": 0,
+      "out_of_memory": 0,
+      "nan_or_inf": 0
+    }
+  },
+  "iteration_conclusion": {
+    "timescale_hypothesis": "rejected",
+    "selection_overfit_detected": false,
+    "fair_enough_single_seed_threshold_met": false,
+    "primary_failure": "role_conditioned_collision_or_deadlock_under_hidden_route_intentions",
+    "structural_evidence": {
+      "actor_observes_route_intentions": false,
+      "critic_observes_route_intentions": false,
+      "actor_receives_one_hot_agent_identity": true,
+      "agent_indices_are_fixed_to_approaches": true,
+      "rewards_are_per_agent_not_shared_team_rewards": true,
+      "explicit_timeout_penalty": false
+    },
+    "next_iteration_started": false,
+    "approval_required_before_task_observation_or_reward_change": true
   }
 }

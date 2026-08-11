@@ -726,3 +726,70 @@ benchmark artifact hashes：best
 `7d62f8acbfae9002d332931d3822b7a1a41f8bdca558e7ae9a524ce032544bb1`，eval records
 `7fc4dc46f9fae68dfbef709ea62d63917e4bd5dc4ba110a8f6940f0a211771f7`。在独立 final
 100 局完成前，不把选择集结果当作 Iteration 6 最终结论，也不启动后续参数迭代。
+
+独立 final test：tmux `mappo-i6-timescale-seed1-final`，artifact
+`runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_225124_880526_test_seed_1/`。
+加载 epoch 96 best，在固定 seeds `20000..20099` 上得到：
+
+| evaluation | episodes | arrival | collision | truncation | mean reward | mean agent arrival |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| I6 selection | 50 | 0.26 | 0.36 | 0.38 | -0.7119 | 0.5800 |
+| I6 independent final | 100 | 0.23 | 0.36 | 0.41 | -1.0347 | 0.5675 |
+| I5 independent final | 100 | 0.38 | 0.01 | 0.61 | 8.1758 | 0.8025 |
+| random, corrected task | 100 | 0.10 | 0.75 | 0.15 | -12.4574 | 0.2375 |
+| idle-only, corrected task | 100 | 0.17 | 0.83 | 0.00 | -16.1293 | 0.1700 |
+
+selection→final 只有 arrival `-0.03`、collision `0`、truncation `+0.03`，说明固定 50 局
+选择没有严重乐观偏差；I6 失败是模型真实性能，而不是验证噪声。相对相同 100 seeds 的
+I5，I6 arrival `-0.15`、collision `+0.35`、mean agent arrival `-0.235`、reward
+`-9.2105`。逐局转移中，I5 的 38 个成功只有 11 个被保留，13 个变碰撞、14 个变超时；
+I5 的 61 个超时虽有 12 个变成功，却有 23 个变碰撞。时间尺度合同因此被明确否证，
+不能继续用相同 `0.998/0.99` 扩展 seed 2/3。
+
+final 的失败结构高度确定：36 个 collision 中 29 个发生时零车辆到达，碰撞步数中位数
+25、均值 31.64；碰撞 agent mask 只有两种，`agent_1+agent_2` 占 30 局，
+`agent_0+agent_3` 占 6 局。41 个 truncation 中 38 个已有 3 辆到达，39 局的未完成
+集合包含 agent 0，其中 36 局只缺 agent 0。6 个视频严格复现了这个结构：seeds
+20000/20002 是只剩 agent 0 的超时，20003/20004 是 agent 1/2 在路口中心早期碰撞，
+20001 成功，20005 是只缺 agent 3 的超时。contact sheet 的终局位置与 episode payload
+一致，并非指标分类错误。
+
+### Iteration 6 失败根因审计
+
+现有 actor/critic 输入存在结构性信息缺口。环境在 reset 时为每辆车随机规划出口路线，
+但配置的 KinematicObservation 只选择
+`presence,x,y,vx,vy,cos_h,sin_h`，没有 destination/route intention；
+`observe_intentions` 也保持默认 false。centralized critic 的 global state 只是按固定 agent
+顺序拼接同一批局部观测，因此 critic 同样看不到路线。车辆进入路口前，未来左转、直行、
+右转在观测中不可辨，策略无法直接判断真实冲突图。
+
+另一方面，XuanCe parameter sharing 会把 one-hot `agent_ids` 拼到 actor/critic 输入，
+而 highway-env 把 agent 0/1/2/3 固定放在 south/west/north/east 四个入口，道路又给水平
+入口更高 priority。策略因此可以用固定身份形成角色启发式，却不能用隐藏的路线意图动态
+协调；final 中几乎完美重复的“agent 0 等待、agent 1/2 碰撞”正是这种身份化局部最优。
+
+奖励仍会放大该问题。adapter 返回 masked per-agent reward，而不是每步共享团队 reward；
+到达 agent 拿 `+10` 后被 mask，未到达 agent 超时没有显式负奖励。I6 的 3/4 到达超时
+仍平均得到 `7.66`，只比全部到达的 `10.39` 低约 `2.73`；对最后一辆而言，在看不到
+路线冲突时等待拿近零、避免 `-40` 是合理的局部选择。反方向把远期 arrival 信号加重，
+则会让部分路线组合成功、另一些不可辨组合抢行碰撞，这正是 I6 相对 I5 的配对转移。
+
+路线生成还存在一个上游扩展瑕疵：默认目的地只从 `o1/o2/o3` 抽样，扩到四辆车后
+agent 1/2/3 约三分之一会抽到自身起点，route planner 会生成一段驶出后绕回的长路线。
+不过 `has_arrived()` 在第一段出口 25 m 即终止 agent，且条件统计没有显示 self-route
+单独决定 outcome，所以它是应清理的任务分布不对称，不是本轮主要失败解释。
+
+最终 artifact hashes：eval metadata
+`66e6eb5a582fe639621911f7b5d75524e541725140b8f9d2910136dfd8f566e7`，eval records
+`4e32eb15e74f6355b8f09561e8ce0a410773b71613356b9d8eee8d43e3ba072c`，video summary
+`539cd56ef72d024af2f9c9c09549bc65ed9ea32c45f11827aa7867c8e1d472fc`，combined video
+`7736e04544f9abde56971fb4d718c8c5a8f1197e7e9f4100cc19d687c0ab41c0`。6 个单局 MP4
+与合并视频均通过 ffprobe。显式
+`results/mappo_iteration6_seed1_final_manifest.json` 已通过严格聚合，输出
+`results/mappo_iteration6_seed1_final_comparison.csv`。
+
+Iteration 6 结论：`gamma=0.998/gae_lambda=0.99` 假设被否证，不做多 seed 扩展，也不
+盲目继续调 PPO 超参。下一项有因果依据的受控实验应先修正可观测性（例如只增加路线
+intention 特征，回退 I5 的 `gamma=0.99/lambda=0.95`，其余冻结），再判断是否仍需团队
+共享终局 reward/timeout penalty。前者改变 observation contract，后者改变 reward/task
+contract，均需明确批准后才能实施；当前没有启动 Iteration 7。
