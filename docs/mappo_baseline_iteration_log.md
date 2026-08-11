@@ -617,3 +617,38 @@ W&B offline 二进制只读检查得到 488 条 rollout diagnostics，每条均�
 `0.036791`，entropy 从 `0.895433` 到 `0.862209`，最大 gradient norm `2.45134`。
 训练更新持续有效且数值稳定，没有冻结、梯度爆炸或策略熵崩塌证据；当前瓶颈更符合
 奖励稀疏后、5 Hz 下 gamma/GAE 时间尺度过短的行为与信用分配问题。
+
+独立 final test：tmux `mappo-i5-reward-ordering-sticky-seed1-final`，artifact
+`runs/mappo_epochs5_ent03_reward_ordering_highway/20260811_195920_893803_test_seed_1/`。
+严格加载 epoch 89 best_model，在固定 seeds `20000..20099` 上运行 100 局 deterministic
+argmax，结果为：
+
+| evaluation | episodes | arrival | collision | truncation | mean reward | mean agent arrival |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| selection (epoch 89) | 50 | 0.28 | 0.04 | 0.68 | 7.0388 | 0.7500 |
+| independent final | 100 | 0.38 | 0.01 | 0.61 | 8.1758 | 0.8025 |
+| random, corrected task | 100 | 0.10 | 0.75 | 0.15 | -12.4574 | 0.2375 |
+| idle-only, corrected task | 100 | 0.17 | 0.83 | 0.00 | -16.1293 | 0.1700 |
+
+final 比选择集更好而非更差，arrival 差 `+0.10`、collision 差 `-0.03`，因此稳健的固定
+50 局 checkpoint 选择已消除旧 5 局选择造成的 `1.00 -> 0.15` 严重乐观失真。
+MAPPO 也明确优于 random/idle-only，且 collision 已接近消失，支持“旧奖励排序造成
+高碰撞局部最优”的假设。但 arrival `0.38 < 0.50`，本 seed 尚未达到单 seed 门槛；
+`61%` episode 因超时失败，mean agent arrival 已达 `0.8025`，表明常见形态是 3/4
+车辆完成、最后一辆没有在 20 秒内完成，而非再次碰撞。
+
+6 段视频严格对应数值验证的前 6 个 seeds `20000..20005`，逐局 outcome、步数与 reward
+完全一致；6 个单局 MP4 和合并 MP4 均通过 ffprobe，另生成 contact sheet。artifact
+哈希：eval metadata
+`3647edceaaa9ec3ec87185a7d6818aea88eba3d128329d596e9940e8a44e6084`，eval records
+`8e0f8bc4fdce4641b63b867b1a7941ee1eda88cf87423940dff99ad72fadfb81`，video summary
+`2bc8126b0aacec65b6edba7bc88d0000658439c8936958674e7fb33bf1c6274b`，combined video
+`ea078bb7be91bdd5c8c4bd07e1744b023430ef14e8bf176eeb4d08309a580edd`。
+`results/mappo_iteration5_sticky_seed1_final_manifest.json` 已通过严格聚合，输出
+`results/mappo_iteration5_sticky_seed1_final_comparison.csv`。
+
+Iteration 5 结论：奖励排序假设得到支持，但修复奖励本身不足以达到验收标准。下一轮按
+此前预注册分支，只把 5 Hz 的时间尺度参数从逐决策步 `gamma=0.99` / GAE
+`lambda=0.95` 校正为 `gamma=0.998` / `lambda=0.99`；奖励、训练预算、PPO 更新、网络、
+seed 与选择/final 协议全部保持不变。可证伪预测是 mean agent arrival 保持高位的同时，
+全局 arrival 上升、truncation 下降；若未发生，则长时程折扣不是主要瓶颈。

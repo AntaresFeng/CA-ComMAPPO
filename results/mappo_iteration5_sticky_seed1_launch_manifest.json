@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "final_validation_running",
+  "status": "final_validation_complete_below_target",
   "iteration": "epochs5-ent03-reward-ordering-sticky-arrival",
   "session_name": "mappo-i5-reward-ordering-sticky-seed1",
   "launched_at": "2026-08-10T22:09:13+08:00",
@@ -181,5 +181,51 @@
     "deterministic_actions": true,
     "action_selection_mode": "deterministic_argmax",
     "launch_command": "tmux new-session -d -s mappo-i5-reward-ordering-sticky-seed1-final -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml --mode test --seed 1 --model-dir-load runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/models/best_model.pth --test-episode 100 --record-video --video-episodes 6 2>&1 | tee runs/launch_logs/mappo_i5_reward_ordering_sticky_seed1_final.log\""
+  },
+  "completed_final_validation": {
+    "completed_at": "2026-08-11T20:00:34+08:00",
+    "episodes": 100,
+    "episode_seed_range": [
+      20000,
+      20099
+    ],
+    "arrival_rate": 0.38,
+    "collision_rate": 0.01,
+    "truncation_rate": 0.61,
+    "mean_episode_reward": 8.175814524483062,
+    "mean_episode_length": 97.14,
+    "mean_agent_arrival_fraction": 0.8025,
+    "mean_agent_collision_fraction": 0.005,
+    "mean_throughput": 0.16531415812245798,
+    "mean_waiting_time": 4.2455,
+    "mean_travel_time": 19.428,
+    "eval_metadata_sha256": "3647edceaaa9ec3ec87185a7d6818aea88eba3d128329d596e9940e8a44e6084",
+    "eval_records_sha256": "8e0f8bc4fdce4641b63b867b1a7941ee1eda88cf87423940dff99ad72fadfb81",
+    "video_summary_sha256": "2bc8126b0aacec65b6edba7bc88d0000658439c8936958674e7fb33bf1c6274b",
+    "combined_video_sha256": "ea078bb7be91bdd5c8c4bd07e1744b023430ef14e8bf176eeb4d08309a580edd",
+    "contact_sheet_sha256": "c001207a969fc2abcdb16cc7fc353c8f89c4b812a3fd2560f4181b78e5402b00",
+    "actual_video_episode_count": 6,
+    "video_episode_seed_range": [
+      20000,
+      20005
+    ],
+    "video_records_match_numeric_evaluation": true,
+    "all_mp4_files_ffprobe_valid": true,
+    "strict_manifest": "results/mappo_iteration5_sticky_seed1_final_manifest.json",
+    "strict_comparison_csv": "results/mappo_iteration5_sticky_seed1_final_comparison.csv",
+    "strict_aggregation_passed": true,
+    "log_error_scan": {
+      "traceback": 0,
+      "runtime_error": 0,
+      "out_of_memory": 0,
+      "nan_or_inf": 0
+    }
+  },
+  "iteration_conclusion": {
+    "reward_ordering_hypothesis": "supported",
+    "selection_overfit_detected": false,
+    "fair_enough_single_seed_threshold_met": false,
+    "primary_remaining_failure": "truncation_after_partial_arrival",
+    "next_controlled_hypothesis": "correct_5hz_gamma_and_gae_time_scale"
   }
 }
