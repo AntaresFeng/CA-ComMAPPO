@@ -687,3 +687,13 @@ nonfinite 计数为 0；sidecar 校验 `gamma=0.998`、GAE `0.99`、CPU、traini
 eval metadata / records SHA-256 分别为
 `d0ff22b3b20a70981fe242d8b8cd94396ab08f7d16f8674a11379dfd450d2e4a` /
 `a584638bbfe259581be7c6d5cfc562d3bc41d1fdea3c54a231d23464ea70bf53`。
+
+正式 benchmark 于 2026-08-11 20:08 启动：tmux `mappo-i6-timescale-seed1`，
+`runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/`。
+命令使用 `--mode benchmark --seed 1` 与 `WANDB_MODE=offline`，正式 training contract
+SHA-256 为 `dd6b23f31897ff7046ebb2785d5dcdeb61a55ebb855de31859629768991fb896`，
+runtime source SHA 继续为
+`dda9ae90dc7e4138194f9520013350e35909870289f61049c32c4e5ffcc49728`。epoch 0 的固定
+50 局为 arrival `0`、collision `0.44`、truncation `0.56`、mean agent arrival
+`0.17`、reward `-6.9040`，与 Iteration 5 初始评估逐项一致；因此正式 run 的初始化、
+环境和奖励轨迹未漂移，后续差异可归因于 gamma/GAE 时间尺度合同。

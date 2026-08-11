@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "status": "benchmark_running",
+  "iteration": "reward-ordering-timescale",
+  "session_name": "mappo-i6-timescale-seed1",
+  "launched_at": "2026-08-11T20:08:11+08:00",
+  "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/",
+  "wandb_offline_run_directory": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/wandb/offline-run-20260811_200813-f7zz7grb/",
+  "launch_log": "runs/launch_logs/mappo_i6_timescale_seed1.log",
+  "working_directory": "/home/fzx/CA-ComMAPPO",
+  "config_path": "configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering-timescale.yaml",
+  "config_file_sha256": "0f69cdd43079ed73c943bc37e3b3cd53af445a234bc32769431133b470e690f3",
+  "checkpoint_training_contract_sha256": "dd6b23f31897ff7046ebb2785d5dcdeb61a55ebb855de31859629768991fb896",
+  "runtime_source_sha256": "dda9ae90dc7e4138194f9520013350e35909870289f61049c32c4e5ffcc49728",
+  "git_head": "1055a70877a503abd64701d432f6017ff16d386b",
+  "training_seed": 1,
+  "training_env_seed": 1000000,
+  "training_env_seed_scheme": "training_seed_times_1000000",
+  "coupled_timescale_change": {
+    "gamma": {
+      "control": 0.99,
+      "iteration": 0.998
+    },
+    "gae_lambda": {
+      "control": 0.95,
+      "iteration": 0.99
+    }
+  },
+  "frozen_training_settings": {
+    "running_steps": 1000000,
+    "parallels": 16,
+    "buffer_size": 2048,
+    "n_epochs": 5,
+    "n_minibatch": 2,
+    "eval_interval": 10000,
+    "ent_coef": 0.03,
+    "collision_reward": -40,
+    "high_speed_reward": 0.01,
+    "arrived_reward": 10
+  },
+  "checkpoint_selection": {
+    "episode_seed_base": 10000,
+    "episode_count": 50,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "final_test": {
+    "episode_seed_base": 20000,
+    "episode_count": 100,
+    "video_episode_count": 6,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax"
+  },
+  "launch_command": "tmux new-session -d -s mappo-i6-timescale-seed1 -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering-timescale.yaml --mode benchmark --seed 1 2>&1 | tee runs/launch_logs/mappo_i6_timescale_seed1.log\"",
+  "environment": {
+    "WANDB_MODE": "offline",
+    "UV_CACHE_DIR": "/tmp/ca-commappo-uv-cache",
+    "MPLCONFIGDIR": "/tmp/ca-commappo-mpl-cache",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "preflight_evidence": {
+    "focused_pytest": "10 passed, 2 warnings",
+    "full_pytest": "201 passed, 2 warnings",
+    "ruff": "unavailable: executable not installed",
+    "save_enabled_smoke_run": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200634_182704_benchmark_seed_1/",
+    "smoke_exact_epoch_count": 2,
+    "smoke_rollout_record_count": 4,
+    "smoke_update_count": 5,
+    "smoke_nonfinite_count": 0,
+    "smoke_best_model_sha256": "3b63be082e809ee6ecef2be6eb3851c3dcc7aacbdf0e1a65fcdb10dd8a100180",
+    "smoke_final_model_sha256": "b48e2c38a74bfc97482d8b2733f98a01d914960e0d1b9b5de4334b34d7c79ba4"
+  },
+  "initial_evaluation_evidence": {
+    "epoch": 0,
+    "step": 0,
+    "arrival_rate": 0.0,
+    "collision_rate": 0.44,
+    "truncation_rate": 0.56,
+    "mean_agent_arrival_fraction": 0.17,
+    "mean_episode_reward": -6.903967926474694,
+    "mean_episode_length": 70.72,
+    "matches_iteration5_initial_evaluation": true,
+    "initial_checkpoint_sha256": "21b01c9dda3d1f6e0aa4c74211685743c28560ce429f93b5a9d1aedbda431645"
+  }
+}
