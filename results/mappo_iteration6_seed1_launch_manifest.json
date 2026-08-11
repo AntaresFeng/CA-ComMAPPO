@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "benchmark_complete_final_validation_pending",
+  "status": "final_validation_running",
   "iteration": "reward-ordering-timescale",
   "session_name": "mappo-i6-timescale-seed1",
   "launched_at": "2026-08-11T20:08:11+08:00",
@@ -153,5 +153,20 @@
       "out_of_memory": 0,
       "nan_or_inf": 0
     }
+  },
+  "final_validation_launch": {
+    "session_name": "mappo-i6-timescale-seed1-final",
+    "launched_at": "2026-08-11T22:51:24+08:00",
+    "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_225124_880526_test_seed_1/",
+    "wandb_offline_run_directory": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_225124_880526_test_seed_1/wandb/offline-run-20260811_225126-sxlf5gqy/",
+    "launch_log": "runs/launch_logs/mappo_i6_timescale_seed1_final.log",
+    "checkpoint_path": "runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/models/best_model.pth",
+    "checkpoint_sha256": "e4213f4cc2660ba6ccde73dc11fda0862760903fe86eb15952e8c8a485259af0",
+    "episode_seed_base": 20000,
+    "episode_count": 100,
+    "video_episode_count": 6,
+    "deterministic_actions": true,
+    "action_selection_mode": "deterministic_argmax",
+    "launch_command": "tmux new-session -d -s mappo-i6-timescale-seed1-final -c /home/fzx/CA-ComMAPPO \"env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1-epochs5-ent03-reward-ordering-timescale.yaml --mode test --seed 1 --model-dir-load runs/mappo_epochs5_ent03_reward_ordering_timescale_highway/20260811_200811_938429_benchmark_seed_1/models/best_model.pth --test-episode 100 --record-video --video-episodes 6 2>&1 | tee runs/launch_logs/mappo_i6_timescale_seed1_final.log\""
   }
 }
