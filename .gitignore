@@ -12,10 +12,9 @@ wheels/
 # Tool caches
 .*_cache/
 
-# Experiment artifacts
+# Generated/raw experiment artifacts; curated summaries in results/ are tracked
 logs/
 models/
-results/
 runs/
 
 # Editor settings

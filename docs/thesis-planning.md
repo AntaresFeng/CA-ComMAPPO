@@ -1,165 +1,89 @@
-> 实验与论文中的 MAPPO 固定基线见 [`mappo_baseline.md`](mappo_baseline.md)。本文只
-> 描述研究主线，不覆盖该文档冻结的任务、训练和评估合同。
+# 论文实验主线
 
-我的建议是：**主线不要从 MADDPG 起步，而是从 MAPPO 起步；创新算法构建在“Permutation-invariant Attention-MAPPO + 显式通信模块”之上。**
+本文只回答“论文要比较什么、验证什么、还缺什么”。固定 MAPPO 任务合同见
+[`mappo_baseline.md`](mappo_baseline.md)，执行方式见
+[`experiments_runbook.md`](experiments_runbook.md)。
 
-原因很直接：`highway-env` 的 `intersection-v0` 本身是无信号路口密集交通任务，默认动作是 `DiscreteMetaAction`，多智能体版本也可以通过 `controlled_vehicles`、`MultiAgentAction`、`MultiAgentObservation` 配置出来；这类离散决策、同质车辆、合作通过路口的任务，更适合先用 MAPPO/IPPO 体系做稳定基线。([highway-env.farama.org][1]) MAPPO 论文也说明，PPO 系列在合作多智能体任务中是很强的实用基线。([arXiv][2])
+## 研究问题
 
-## 1. 基线怎么选
+在 highway-env 无信号路口的合作式离散控制中，验证三层递进：
 
-我建议分成三组，而不是只选一个“普通 MAPPO”。
+```text
+MAPPO → permutation-invariant Attention-MAPPO → CA-ComMAPPO
+```
 
-**第一组：必要 sanity baseline**
+核心问题是：顺序无关的社会编码是否改善多车状态建模，以及带运动学冲突先验的选择性
+通信是否比无通信或通用通信更安全、更高效。
 
-| Baseline                       | 作用                              |
-| ------------------------------ | ------------------------------- |
-| Random / Rule-based / IDM-like | 检查环境、奖励、碰撞统计是否正常                |
-| IPPO                           | 每车独立策略，无 centralized critic，无通信 |
-| MAPPO                          | CTDE，无显式通信，是你的主算法底座             |
+## 算法矩阵
 
-**第二组：强结构基线**
+| 组别 | 方法 | 控制变量 |
+| --- | --- | --- |
+| 环境下界 | random、idle-only | 验证任务和指标是否合理 |
+| 无通信 | IPPO、MAPPO | centralized critic 的贡献 |
+| 结构基线 | Attention-MAPPO | PI social encoder 的贡献 |
+| 通信基线 | CommNet、IC3Net | 平均通信与门控通信 |
+| 完整方法 | CA-ComMAPPO | PI encoder + conflict-aware attention communication |
+| 关键消融 | CA-ComMAPPO no-prior | 移除 `b_ij`，保留 attention communication |
 
-| Baseline                             | 作用                          |
-| ------------------------------------ | --------------------------- |
-| MAPPO-MLP                            | 普通 MAPPO，作为最低 MARL baseline |
-| MAPPO + DeepSets / Attention Encoder | 解决车辆顺序敏感问题，但不引入通信           |
-| MAPPO + Social Attention             | 针对路口多车交互，是非常重要的强基线          |
+Attention-MAPPO 同时承担 permutation-invariant / social-attention 强基线。CommNet 和
+IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格的单变量消融。
 
-这一组很关键。`highway-env` 文档明确提到，MLP 对车辆列表顺序敏感，同一场景如果车辆排序变化，模型会把它当成新状态；官方建议使用 permutation-invariant 架构，或者换成不依赖排序的观测表示。([highway-env.farama.org][3]) Social Attention 也正是为“车辆数量变化、顺序无关、交通参与者交互建模”设计的。([Eleurent][4])
+## 假设与证据
 
-**第三组：通信 MARL baseline**
+| 假设 | 必需证据 | 不能替代它的证据 |
+| --- | --- | --- |
+| H1：MAPPO 学到优于静态策略的协作 | 相同 100 cases 上的 arrival/collision/reward | 训练曲线或少量视频 |
+| H2：PI encoder 降低顺序敏感性 | MAPPO 与 Attention-MAPPO 的原序/扰动配对测试 | 只做普通 final test |
+| H3：显式通信改善协作 | Attention-MAPPO 与 CA-ComMAPPO 多 seed 对比 | CA 与 CommNet 单独比较 |
+| H4：冲突先验有贡献 | full 与 no-prior 的配对多 seed 消融 | attention heatmap |
+| H5：方法可解释 | 固定案例的 attention/TTC 导出与轨迹视频 | 单张挑选的成功截图 |
+| H6：方法对规模变化稳健 | 预注册的跨车辆数协议和兼容 checkpoint | 仅声称 PI 理论上不变 |
 
-| Baseline |      是否建议做 | 说明                                                 |
-| -------- | ---------: | -------------------------------------------------- |
-| CommNet  |         建议 | 经典连续通信基线，适合作为“平均通信/全局广播”对照                         |
-| IC3Net   |         建议 | CommNet 的门控通信扩展，可比较“是否学习何时通信”                      |
-| MAAC     |         可选 | 注意力 critic，不一定是显式通信，但可以作为 attention-MARL 对照        |
-| MADDPG   | 可选，不建议作为主线 | 更适合连续动作或混合竞争任务；你当前 `DiscreteMetaAction` 场景下不是最自然选择 |
+## 主要指标
 
-CommNet 的核心是让多智能体通过可微连续消息一起学习通信协议，主要面向完全合作任务；IC3Net 进一步加入 gate，让智能体学习“何时通信”。([arXiv][5]) MADDPG 的价值在于 centralized critic、decentralized actor，并考虑其他智能体策略，适合 mixed cooperative-competitive 场景，但你的研究点1更偏“合作车辆通过路口 + 显式通信机制”，所以它不是最优主线。([arXiv][6]) MAAC 的 attention critic 可以动态选择关注哪些智能体，适合做 attention 对照，但它的重点是 critic 选择信息，不等同于车辆间通信。([arXiv][7])
+- 安全：episode collision rate、agent collision fraction。
+- 成功：episode arrival rate、agent arrival fraction。
+- 效率：travel time、waiting time、throughput。
+- 优化参考：episode/agent reward；reward 不作为唯一论文结论。
+- 稳健性：跨训练 seed 的 sample std，以及配对置信区间或显著性检验。
 
-## 2. 你的创新算法从什么基础构建
+所有指标由共享 evaluator 产生。best checkpoint 排序固定为
+`arrival↑ → collision↓ → reward↑ → length↓`；最终表只使用独立 100-episode test。
 
-推荐主线：
+## 当前完成度
 
-**MAPPO → Attention-MAPPO → Conflict-aware Communication MAPPO**
+| 项目 | 状态 |
+| --- | --- |
+| 环境适配、统一指标、固定评估 seed、provenance | 已完成 |
+| MAPPO canonical 配置与 seed 1 benchmark/final/video | 已完成 |
+| random / idle-only 同 case 正式结果 | 已完成 |
+| IPPO、Attention-MAPPO、CommNet、IC3Net、CA-ComMAPPO 代码与主配置 | 已有，需逐项重新 smoke |
+| MAPPO seeds 2/3 | 未运行 |
+| 其他学习算法多 seed 正式训练 | 未运行 |
+| 顺序扰动 evaluator | 未实现 |
+| attention/TTC 导出和论文图 | 未实现 |
+| 跨车辆数 checkpoint 兼容协议 | 未设计完成 |
+| 最终统计检验与论文结果归档 | 未完成 |
 
-也就是：
+当前只能把 MAPPO seed 1 作为参考结果，不能形成跨算法论文结论。
 
-> 以 MAPPO 为训练框架，以 permutation-invariant attention encoder 处理路口多车观测，再加入面向无信号路口冲突关系的显式通信模块。
+## 实施顺序
 
-这样论文逻辑最清楚：
+1. 修复 [`ca_commappo_design.md`](ca_commappo_design.md) 中阻断正式训练的设计债务，
+   增加端到端 smoke 回归。
+2. 在同一提交上 smoke 全算法，冻结算法矩阵和最小训练 seed 集 `[1,2,3]`。
+3. 补齐 MAPPO seeds 2/3，确认基线方差和资源预算。
+4. 依次运行 Attention-MAPPO、CA-ComMAPPO/no-prior，再运行 IPPO、CommNet、IC3Net。
+5. 实现顺序扰动与 attention 导出；协议先于结果冻结。
+6. 只有解决 agent identity、critic 输入和 checkpoint shape 后，才启动 4→6/8/10
+   车辆泛化实验。
+7. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
 
-普通 MAPPO 解决多车合作；
-Attention-MAPPO 解决“车辆顺序无关、多车交互建模”；
-你的方法进一步解决“车辆之间应该交换什么信息、与谁通信、如何利用通信提高通过效率和安全性”。
+## 论文边界
 
-## 3. 具体如何构建
-
-可以把每辆受控车作为一个 agent。每个 agent 的输入包括自身状态、周围车辆状态、目标出口或行驶意图。不要直接把车辆列表 flatten 后送 MLP，而是先用共享 encoder 编码每辆邻车：
-
-[
-e_{ij} = \phi(o_i, o_j)
-]
-
-其中 (o_i) 是自车状态，(o_j) 是邻车状态，最好使用相对位置、相对速度、航向、距离冲突点时间等特征。然后用 attention 或 DeepSets 聚合：
-
-[
-z_i = \text{AttnPool}({e_{ij}})
-]
-
-这一步得到每个 agent 的局部交通理解，且对车辆顺序不敏感。
-
-接着加入通信模块：
-
-[
-m_i = f_m(z_i, intent_i, ttc_i)
-]
-
-每辆车发送消息 (m_i)。接收端不是简单平均所有消息，而是做**冲突感知 attention**：
-
-[
-c_i = \sum_{j \neq i} \alpha_{ij} W_v m_j
-]
-
-其中 (\alpha_{ij}) 可以由以下信息决定：
-
-[
-\alpha_{ij} = \text{softmax}(q_i^\top k_j + b_{ij})
-]
-
-(b_{ij}) 可以设计成路口冲突先验，例如两车路径是否冲突、到达冲突点时间差、距离冲突区域远近、相对优先级等。这样你的创新点就不是“我也用了 attention”，而是：
-
-**通信不是全连接平均通信，而是围绕无信号路口冲突关系的选择性通信。**
-
-最终 actor：
-
-[
-\pi_i(a_i | z_i, c_i)
-]
-
-centralized critic：
-
-[
-V(s) \quad \text{或} \quad V({z_i, m_i, a_i}_{i=1}^N)
-]
-
-训练用 MAPPO 的 clipped PPO loss，执行时每辆车只使用自己的观测和接收到的消息，符合 CTDE 思路。
-
-## 4. 你的算法可以怎么命名和包装
-
-可以考虑类似：
-
-**CA-ComMAPPO：Conflict-Aware Communication MAPPO**
-
-核心模块：
-
-1. **Permutation-invariant social encoder**：解决车辆顺序敏感问题。
-2. **Conflict-aware communication graph**：根据路口冲突关系构建通信边。
-3. **Attention message aggregation**：学习不同车辆消息的重要性。
-4. **MAPPO centralized critic**：保证训练稳定。
-5. **Ablation**：去掉通信、去掉冲突先验、去掉 attention、换成 CommNet 平均通信。
-
-这个设计比“普通 MAPPO 加 attention”更像论文创新，因为它把通信机制和无信号路口场景强绑定。
-
-## 5. 推荐实验顺序
-
-先不要一上来做复杂现实通信。研究点1建议这样推进：
-
-1. 跑通 `intersection-v0` 多智能体配置：`controlled_vehicles > 1`，`MultiAgentAction`，`MultiAgentObservation`。
-2. 先做 IPPO、MAPPO-MLP。
-3. 加 DeepSets / Attention Encoder，验证 permutation-invariant 结构是否提升。
-4. 加 CommNet-MAPPO、IC3Net-MAPPO。
-5. 加你的 CA-ComMAPPO。
-6. 做泛化实验：训练 4 辆车，测试 6、8、10 辆车。
-7. 做顺序扰动实验：随机打乱观测中车辆顺序，证明普通 MLP 不稳定，而你的方法稳定。
-8. 做通信消融：无通信、全连接平均通信、attention 通信、conflict-aware attention 通信。
-
-评价指标建议至少包括：
-
-| 指标                                    | 含义        |
-| ------------------------------------- | --------- |
-| collision rate                        | 安全性       |
-| success / pass rate                   | 是否成功通过路口  |
-| average travel time                   | 通行效率      |
-| waiting time                          | 路口等待代价    |
-| throughput                            | 单位时间通过车辆数 |
-| average reward                        | RL 通用指标   |
-| generalization to vehicle number      | 多车扩展能力    |
-| communication attention visualization | 可解释性      |
-
-## 6. 最终推荐结论
-
-你的基线组合可以写成：
-
-> 本文首先采用 IPPO 和 MAPPO 作为无通信多智能体强化学习基线；考虑到 highway-env 中基于车辆列表的运动学观测存在顺序敏感问题，进一步引入 permutation-invariant attention encoder 构建 Attention-MAPPO 作为强结构基线；随后选取 CommNet 和 IC3Net 作为经典通信 MARL 基线；在此基础上，提出面向无信号路口冲突关系的 Conflict-aware Communication MAPPO，通过冲突图和注意力消息聚合实现理想通信条件下的协同驾驶决策。
-
-一句话：**主算法底座选 MAPPO，强基线必须包含 Attention-MAPPO，通信基线选 CommNet/IC3Net，你的创新算法做“冲突感知 + 顺序无关 + 显式通信”的 MAPPO 扩展。**
-
-[1]: https://highway-env.farama.org/environments/intersection/ "Intersection - HighwayEnv Documentation"
-[2]: https://arxiv.org/abs/2103.01955 "[2103.01955] The Surprising Effectiveness of PPO in Cooperative, Multi-Agent Games"
-[3]: https://highway-env.farama.org/faq/ "Frequently Asked Questions - HighwayEnv Documentation"
-[4]: https://eleurent.github.io/social-attention/ "Abstract | Social Attention for Autonomous Decision-Making in Dense Traffic"
-[5]: https://arxiv.org/abs/1605.07736 "[1605.07736] Learning Multiagent Communication with Backpropagation"
-[6]: https://arxiv.org/abs/1706.02275 "[1706.02275] Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments"
-[7]: https://arxiv.org/abs/1810.02912 "[1810.02912] Actor-Attention-Critic for Multi-Agent Reinforcement Learning"
+- 研究假设尚未由多 seed 实验验证，文中应区分“设计目标”和“实证结论”。
+- 冲突先验是单中心 kinematic proxy，不包含真实路线优先级或所有背景车辆。
+- 理想通信不考虑延迟、丢包、带宽和隐私；这些属于后续工作。
+- MAAC 与 MADDPG 暂不进入主矩阵：前者关注 attention critic，后者不适合当前离散
+  动作主线；如后续加入，必须预注册其角色和比较口径。

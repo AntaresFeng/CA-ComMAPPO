@@ -1,4 +1,8 @@
-# Highway-env config shallow-update note
+# Highway-env 浅合并问题调查（已修复）
+
+> 归档日期：2026-08-13。当前适配器已经在调用 `gym.make(...)` 前完成嵌套配置
+> 深度合并。本文仅保留 2026-06-28 的复现过程；当前环境契约见
+> `docs/environment.md`。
 
 Date checked: 2026-06-28
 
