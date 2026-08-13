@@ -7,4 +7,5 @@ use_rnn: false
 use_global_state: true
 recede_penalty: 10.0
 ttc_max: 50.0
+conflict_lambda_init: 1.0
 output_dir: "runs/ca_commappo_highway/"

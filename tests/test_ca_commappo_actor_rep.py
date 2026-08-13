@@ -5,14 +5,13 @@ These pin the actor representation contract for Phase 3:
 * ``output_shapes`` is ``{'state': (H + comm_dim,)}``;
 * ``forward`` on a param-sharing batch ``(n_env*n_agents, 105)`` returns a
   ``{'state': (batch, H + comm_dim)}`` dict with finite values;
-* the per-agent ``ttc``/``intent`` derived from the ego row are correct:
+* the per-agent scaled ``ttc``/``intent`` derived from the ego row are correct:
   an ego heading *toward* the conflict point C=(0,0) is flagged approaching
-  (``intent=1``, ``ttc < TTC_MAX``); an ego heading *away* is receding
-  (``intent=0``, ``ttc == TTC_MAX``).
+  (``intent=1``, ``0 <= ttc < 1``); an ego heading *away* is receding and
+  receives the capped rationally scaled TTC.
 """
 
 from __future__ import annotations
-
 
 import numpy as np
 import pytest
@@ -91,7 +90,7 @@ class TestTTCIntent:
         assert x is not None
         ttc, intent = rep._ttc_intent(ego.unsqueeze(0))
         assert intent.item() == 1.0
-        assert 0.0 <= ttc.item() < TTC_MAX
+        assert ttc.item() == pytest.approx(0.5)
 
     def test_receding_ego_gets_ttc_max_and_intent_zero(self):
         rep = _build_rep(n_agents=1, hidden=16)
@@ -99,7 +98,15 @@ class TestTTCIntent:
         ego = _ego_row(x=1.0, y=0.0, vx=1.0, vy=0.0, cos_h=1.0, sin_h=0.0)
         ttc, intent = rep._ttc_intent(ego.unsqueeze(0))
         assert intent.item() == 0.0
-        assert ttc.item() == TTC_MAX
+        assert ttc.item() == pytest.approx(TTC_MAX / (TTC_MAX + 1.0))
+
+    def test_ttc_scaling_is_bounded_and_monotonic(self):
+        rep = _build_rep(n_agents=1, hidden=16)
+        near = _ego_row(0.5, 0.0, -1.0, 0.0, -1.0, 0.0)
+        far = _ego_row(2.0, 0.0, -1.0, 0.0, -1.0, 0.0)
+        ttc_near, _ = rep._ttc_intent(near.unsqueeze(0))
+        ttc_far, _ = rep._ttc_intent(far.unsqueeze(0))
+        assert 0.0 <= ttc_near.item() < ttc_far.item() < 1.0
 
     def test_mixed_pair_comm_runs_without_error(self):
         rep = _build_rep(n_agents=2, hidden=16)

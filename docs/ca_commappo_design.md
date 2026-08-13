@@ -23,11 +23,14 @@ centralized training / decentralized execution。该通信只覆盖受控 agent�
 ```text
 d_i        = ||pos_i||
 approach_i = heading_i · (-pos_i / (d_i + eps))
-ttc_i      = clamp(d_i / (speed_i + eps), max=TTC_MAX)
+tau_i      = clamp(d_i / (speed_i + eps), 0, TTC_MAX)
+ttc_i      = tau_i / (tau_i + 1)
 intent_i   = 1[approach_i > 0]
 ```
 
-不朝向中心的 agent 令 `ttc_i=TTC_MAX`。消息为：
+不朝向中心的 agent 令 `tau_i=TTC_MAX`，再按同一公式缩放。消息和冲突偏置只使用
+`ttc_i`，因此运动学头有界于 `[0,1)`，不会把原始 `[0,50]` 尺度直接送入线性层或
+softmax。
 
 ```text
 m_i = concat(z_i, ttc_i, intent_i)
@@ -42,12 +45,18 @@ alpha_ij = masked_softmax_j(score_ij), j != i
 c_i      = sum_j alpha_ij * W_v m_j
 ```
 
-`mu` 对背离车辆施加固定惩罚；`use_conflict_prior=false` 时令 `b_ij=0`，对应“有
+有效 `lambda=softplus(raw_lambda)`，初始有效值由 `conflict_lambda_init=1.0` 决定，
+因此训练中不会变负并反转 TTC 相似性。`mu` 对背离车辆施加固定惩罚；
+`use_conflict_prior=false` 时令 `b_ij=0`，对应“有
 attention、无冲突先验”的消融。masked softmax 排除自身和失活发送方，在没有有效
 发送方时返回零上下文。
 
 上述公式描述的是当前代码，而不是理想化版本：query 和 key 都读取完整消息，intent
-是硬二值，TTC 以原始代理尺度进入消息。
+是硬二值。
+
+通信合同随 checkpoint 持久化为版本 `1`。版本 1 表示有界 TTC 与非负 lambda；缺少
+版本字段、包含旧 `comm.lam` 参数或版本不匹配的 CA-ComMAPPO checkpoint 会被明确
+拒绝。旧模型只允许保留为历史证据，不能迁移或用于正式对比。
 
 ## 实现映射
 
@@ -79,15 +88,11 @@ attention、无冲突先验”的消融。masked softmax 排除自身和失活�
 
 以下问题尚未解决，不能把当前 CA-ComMAPPO 结果作为最终论文证据：
 
-1. `lambda` 是无约束参数，训练后可能为负并反转 TTC 相似性；应改为非负参数化并加
-   回归测试。
-2. 原始 TTC 范围可达 `TTC_MAX=50`，同时进入消息与 bias，可能主导 dot-product 并
-   让 softmax 饱和；应冻结一种缩放口径后同步代码、公式与消融。
-3. `CAComMAPPOActorRep.forward()` 当前传入全 1 alive mask；inactive agent 的旧消息
+1. `CAComMAPPOActorRep.forward()` 当前传入全 1 alive mask；inactive agent 的旧消息
    仍可能影响 active agent。应从 rollout 信息传递真实 agent mask。
-4. 现有测试覆盖模块形状、mask 和先验单调性，但缺少构造完整 agent 后执行真实环境
+2. 现有测试覆盖模块形状、mask 和先验单调性，但缺少构造完整 agent 后执行真实环境
    action/update 的端到端回归。
-5. 车辆数量变化会同时改变 agent identity 和 critic 输入形状；在完成 checkpoint
+3. 车辆数量变化会同时改变 agent identity 和 critic 输入形状；在完成 checkpoint
    兼容方案前，不得宣称模型可直接从 4 辆泛化到 6/8/10 辆。
 
 修复这些问题属于算法变更，必须单独提交、通过完整测试和 smoke，再启动 CA-ComMAPPO

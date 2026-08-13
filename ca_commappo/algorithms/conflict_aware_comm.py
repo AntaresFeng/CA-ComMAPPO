@@ -26,11 +26,11 @@ This is a drop-in replacement for the *aggregation* step of XuanCe's ``CommNet``
 
 from __future__ import annotations
 
-from typing import Optional, Union
+import math
 
 import torch
 from torch import nn
-
+from torch.nn import functional as F
 from xuance.torch import Module
 
 # Cap for the TTC proxy of agents that are not approaching the conflict point
@@ -66,7 +66,7 @@ class ConflictAwareComm(Module):
         recede_penalty: float = 10.0,
         lam_init: float = 1.0,
         use_conflict_prior: bool = True,
-        device: Optional[Union[str, int, torch.device]] = None,
+        device: str | int | torch.device | None = None,
     ):
         super().__init__()
         self.msg_dim = msg_dim
@@ -81,8 +81,18 @@ class ConflictAwareComm(Module):
         self.W_q = nn.Linear(msg_dim, comm_dim, device=device)
         self.W_k = nn.Linear(msg_dim, comm_dim, device=device)
         self.W_v = nn.Linear(msg_dim, comm_dim, device=device)
-        self.lam = nn.Parameter(torch.tensor(float(lam_init), device=device))
+        lam_init = float(lam_init)
+        if not math.isfinite(lam_init) or lam_init <= 0.0:
+            raise ValueError("lam_init must be a finite positive value")
+        raw_lam_init = math.log(math.expm1(lam_init))
+        self.raw_lambda = nn.Parameter(torch.tensor(raw_lam_init, device=device))
         self.scale = float(comm_dim) ** 0.5
+
+    @property
+    def lambda_value(self) -> torch.Tensor:
+        """Effective non-negative TTC-similarity coefficient."""
+
+        return F.softplus(self.raw_lambda)
 
     @staticmethod
     def _alive_2d(alive_ally, n_env: int, n_agents: int, device) -> torch.Tensor:
@@ -106,7 +116,7 @@ class ConflictAwareComm(Module):
 
         dot = torch.einsum("eid,ejd->eij", q, k) / self.scale  # (E, A, A)
         if self.use_conflict_prior:
-            ttc_bias = -self.lam * torch.abs(ttc[:, :, None] - ttc[:, None, :])
+            ttc_bias = -self.lambda_value * torch.abs(ttc[:, :, None] - ttc[:, None, :])
             recede_bias = -self.recede_penalty * (
                 recede[:, :, None] + recede[:, None, :]
             )

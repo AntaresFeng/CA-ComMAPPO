@@ -9,4 +9,5 @@ use_global_state: true
 use_conflict_prior: false
 recede_penalty: 10.0
 ttc_max: 50.0
+conflict_lambda_init: 1.0
 output_dir: "runs/ca_commappo_no_prior_highway/"

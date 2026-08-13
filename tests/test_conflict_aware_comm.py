@@ -13,16 +13,19 @@ These tests pin down the Phase 3 comm module contract:
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 
-from ca_commappo.algorithms.conflict_aware_comm import ConflictAwareComm
+from ca_commappo.algorithms.conflict_aware_comm import TTC_MAX, ConflictAwareComm
 
 MSG_DIM = 6  # e.g. H=4 hidden + ttc(1) + intent(1)
 TTC_SLOT = 4
 INTENT_SLOT = 5
 COMM_DIM = 8
 N_AGENTS = 3
+TTC_SCALED_MAX = TTC_MAX / (TTC_MAX + 1.0)
 
 
 @pytest.fixture(autouse=True)
@@ -47,17 +50,21 @@ def _build_comm() -> ConflictAwareComm:
 def _messages(n_env, n_agents, *, ttc_values, seed=1):
     """Build m_send with random z/head and a chosen ttc per agent.
 
-    ttc_values: shape (n_env, n_agents). intent is set to 1 for approaching
-    agents (ttc < TTC_MAX) and 0 for receding ones (ttc >= TTC_MAX).
+    ttc_values contains the bounded values carried by the message. Intent is
+    zero only for the capped receding value.
     """
-    from ca_commappo.algorithms.conflict_aware_comm import TTC_MAX
-
     g = torch.Generator().manual_seed(seed)
     m = torch.randn(n_env, n_agents, MSG_DIM, generator=g)
     ttc = torch.as_tensor(ttc_values, dtype=torch.float32)
     m[..., TTC_SLOT] = ttc
-    m[..., INTENT_SLOT] = (ttc < TTC_MAX).float()
+    m[..., INTENT_SLOT] = (ttc < TTC_SCALED_MAX).float()
     return m
+
+
+def _set_effective_lambda(comm: ConflictAwareComm, value: float) -> None:
+    raw = math.log(math.expm1(value))
+    with torch.no_grad():
+        comm.raw_lambda.fill_(raw)
 
 
 class TestOutputContract:
@@ -69,11 +76,34 @@ class TestOutputContract:
         assert c.shape == (2, N_AGENTS, COMM_DIM)
         assert torch.isfinite(c).all()
 
+    def test_lambda_initial_value_is_preserved_by_positive_parameterization(self):
+        comm = _build_comm()
+        assert comm.lambda_value.item() == pytest.approx(1.0)
+
+    def test_lambda_stays_positive_and_has_finite_gradient(self):
+        comm = _build_comm()
+        with torch.no_grad():
+            comm.raw_lambda.fill_(-100.0)
+        assert 0.0 <= comm.lambda_value.item() < 1e-20
+
+        with torch.no_grad():
+            comm.raw_lambda.fill_(0.0)
+            comm.W_q.weight.zero_()
+            comm.W_q.bias.zero_()
+            comm.W_k.weight.zero_()
+            comm.W_k.bias.zero_()
+        m = _messages(1, N_AGENTS, ttc_values=[[0.0, 0.2, 0.8]])
+        loss = comm.attention(m, torch.ones(1, N_AGENTS))[0, 0, 1]
+        loss.backward()
+        assert comm.raw_lambda.grad is not None
+        assert torch.isfinite(comm.raw_lambda.grad)
+        assert comm.raw_lambda.grad.abs().item() > 0.0
+
 
 class TestAttentionNormalization:
     def test_weights_sum_to_one_over_receivers(self):
         comm = _build_comm()
-        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 3.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.3]])
         alive = torch.ones(1, N_AGENTS)
         alpha = comm.attention(m, alive)
         assert alpha.shape == (1, N_AGENTS, N_AGENTS)
@@ -82,7 +112,7 @@ class TestAttentionNormalization:
 
     def test_self_is_excluded(self):
         comm = _build_comm()
-        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 3.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.3]])
         alive = torch.ones(1, N_AGENTS)
         alpha = comm.attention(m, alive)
         # diagonal (i == j) must be exactly zero
@@ -91,7 +121,7 @@ class TestAttentionNormalization:
 
     def test_dead_agent_is_masked_out(self):
         comm = _build_comm()
-        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 3.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.3]])
         alive = torch.ones(1, N_AGENTS)
         alive[0, 1] = 0.0  # agent 1 dead -> nobody attends to it
         alpha = comm.attention(m, alive)
@@ -110,12 +140,12 @@ class TestConflictPriorMonotonicity:
             comm.W_k.bias.zero_()
 
         # Agent 0 sees two partners: agent 1 (ttc close to 0) and agent 2 (ttc far).
-        m = _messages(1, N_AGENTS, ttc_values=[[0.0, 0.5, 10.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.0, 0.2, 0.9]])
         alive = torch.ones(1, N_AGENTS)
         alpha = comm.attention(m, alive)[0]  # (n_agents, n_agents)
 
-        a_01 = alpha[0, 1].item()  # |0 - 0.5| = 0.5 (small diff)
-        a_02 = alpha[0, 2].item()  # |0 - 10| = 10 (large diff)
+        a_01 = alpha[0, 1].item()
+        a_02 = alpha[0, 2].item()
         assert a_01 > a_02
 
     def test_lambda_scales_bias(self):
@@ -127,10 +157,10 @@ class TestConflictPriorMonotonicity:
                 c.W_q.bias.zero_()
                 c.W_k.weight.zero_()
                 c.W_k.bias.zero_()
-            comm_small.lam.fill_(0.1)
-            comm_large.lam.fill_(10.0)
+        _set_effective_lambda(comm_small, 0.1)
+        _set_effective_lambda(comm_large, 10.0)
 
-        m = _messages(1, N_AGENTS, ttc_values=[[0.0, 1.0, 5.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.0, 0.2, 0.9]])
         alive = torch.ones(1, N_AGENTS)
         a_small = comm_small.attention(m, alive)[0, 0, 1].item()
         a_large = comm_large.attention(m, alive)[0, 0, 1].item()
@@ -142,8 +172,6 @@ class TestConflictScenario:
     def test_approaching_pair_attends_more_than_receding_pair(self):
         """Two agents both approaching C (small similar ttc) vs both receding
         (ttc = TTC_MAX). The approaching pair should have higher mutual alpha."""
-        from ca_commappo.algorithms.conflict_aware_comm import TTC_MAX
-
         comm = _build_comm()
         with torch.no_grad():
             comm.W_q.weight.zero_()
@@ -152,9 +180,13 @@ class TestConflictScenario:
             comm.W_k.bias.zero_()
 
         # Approaching: both small, similar ttc.
-        m_approach = _messages(1, N_AGENTS, ttc_values=[[1.0, 1.2, TTC_MAX]])
+        m_approach = _messages(1, N_AGENTS, ttc_values=[[0.5, 0.55, TTC_SCALED_MAX]])
         # Receding: both TTC_MAX.
-        m_recede = _messages(1, N_AGENTS, ttc_values=[[TTC_MAX, TTC_MAX, TTC_MAX]])
+        m_recede = _messages(
+            1,
+            N_AGENTS,
+            ttc_values=[[TTC_SCALED_MAX, TTC_SCALED_MAX, TTC_SCALED_MAX]],
+        )
         alive = torch.ones(1, N_AGENTS)
 
         alpha_approach = comm.attention(m_approach, alive)[0, 0, 1].item()
@@ -192,7 +224,7 @@ class TestAblationNoConflictPrior:
     def test_no_prior_gives_uniform_attention_with_zeroed_qk(self):
         comm = self._build(use_prior=False)
         self._zero_qk(comm)
-        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 3.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.3]])
         alive = torch.ones(1, N_AGENTS)
         alpha = comm.attention(m, alive)[0]  # (A, A)
         # Each receiver i has n_agents-1 valid partners (self excluded); with
@@ -205,9 +237,19 @@ class TestAblationNoConflictPrior:
     def test_prior_makes_attention_nonuniform_with_zeroed_qk(self):
         comm = self._build(use_prior=True)
         self._zero_qk(comm)
-        m = _messages(1, N_AGENTS, ttc_values=[[1.0, 2.0, 10.0]])
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.9]])
         alive = torch.ones(1, N_AGENTS)
         alpha = comm.attention(m, alive)[0]
         # Agent 0's two partners (1, 2) have |ttc diff| 1 and 9 -> non-uniform.
         a01, a02 = alpha[0, 1].item(), alpha[0, 2].item()
         assert abs(a01 - a02) > 1e-4
+
+    def test_no_prior_output_is_independent_of_lambda(self):
+        comm = self._build(use_prior=False)
+        m = _messages(1, N_AGENTS, ttc_values=[[0.1, 0.2, 0.9]])
+        alive = torch.ones(1, N_AGENTS)
+        _set_effective_lambda(comm, 0.1)
+        low_lambda = comm(m, alive)
+        _set_effective_lambda(comm, 10.0)
+        high_lambda = comm(m, alive)
+        assert torch.equal(low_lambda, high_lambda)

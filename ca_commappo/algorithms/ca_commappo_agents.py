@@ -16,11 +16,10 @@ input dim auto-includes the comm context). ``CA_ComMAPPO_Policy`` /
 from __future__ import annotations
 
 from argparse import Namespace
-from typing import List, Optional
+from collections.abc import Mapping
 
 import torch
 from gymnasium import Space
-
 from xuance.environment import (
     DummyVecMultiAgentEnv,
     SubprocVecMultiAgentEnv,
@@ -40,6 +39,8 @@ from ca_commappo.algorithms.representations import (
     _VEHICLES_COUNT,
     PermutationInvariantAttention,
 )
+
+CA_COMMUNICATION_CONTRACT_VERSION = 1
 
 
 class CAComMAPPOActorRep(Module):
@@ -64,9 +65,10 @@ class CAComMAPPOActorRep(Module):
         activation=None,
         device=None,
         n_agents: int = 1,
-        comm_dim: Optional[int] = None,
+        comm_dim: int | None = None,
         recede_penalty: float = 10.0,
         ttc_max: float = TTC_MAX,
+        conflict_lambda_init: float = 1.0,
         use_conflict_prior: bool = True,
         **kwargs,
     ):
@@ -96,6 +98,7 @@ class CAComMAPPOActorRep(Module):
             ttc_slot=hidden,
             intent_slot=hidden + 1,
             recede_penalty=recede_penalty,
+            lam_init=conflict_lambda_init,
             use_conflict_prior=use_conflict_prior,
             device=device,
         )
@@ -116,7 +119,8 @@ class CAComMAPPOActorRep(Module):
         ttc = torch.where(
             not_approaching, torch.full_like(ttc_raw, self.ttc_max), ttc_raw
         )
-        ttc = torch.clamp(ttc, max=self.ttc_max)
+        ttc = torch.clamp(ttc, min=0.0, max=self.ttc_max)
+        ttc = ttc / (ttc + 1.0)
         intent = (~not_approaching).float()
         return ttc, intent
 
@@ -157,14 +161,65 @@ class CA_ComMAPPO_Policy(MAAC_Policy):
     the actor representation). Exists for the ``policy: "CA_ComMAPPO_Policy"``
     config string and as the registration target."""
 
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.register_buffer(
+            "_communication_contract_version",
+            torch.tensor(CA_COMMUNICATION_CONTRACT_VERSION, dtype=torch.int64),
+            persistent=True,
+        )
+
+    def load_state_dict(
+        self,
+        state_dict: Mapping[str, torch.Tensor],
+        strict: bool = True,
+        assign: bool = False,
+    ):
+        version_key = "_communication_contract_version"
+        if version_key not in state_dict:
+            raise RuntimeError(
+                "Legacy CA-ComMAPPO checkpoint is incompatible with the scaled-TTC "
+                "and non-negative-lambda communication contract; retrain it."
+            )
+        version = int(torch.as_tensor(state_dict[version_key]).item())
+        if version != CA_COMMUNICATION_CONTRACT_VERSION:
+            raise RuntimeError(
+                "Unsupported CA-ComMAPPO communication contract version "
+                f"{version}; expected {CA_COMMUNICATION_CONTRACT_VERSION}."
+            )
+        if any(key.endswith(".comm.lam") for key in state_dict):
+            raise RuntimeError(
+                "Legacy CA-ComMAPPO checkpoint contains the unconstrained lam "
+                "parameter and cannot be loaded; retrain it."
+            )
+        return super().load_state_dict(state_dict, strict=strict, assign=assign)
 
 
 class CA_ComMAPPO_Learner(MAPPO_Learner):
     """CA-ComMAPPO learner; reuses MAPPO's clipped PPO loss (comm not in critic
     yet, per design doc §9 future work)."""
 
-    pass
+    def update(self, sample):
+        info = super().update(sample)
+        comm_modules = [
+            representation.comm
+            for representation in self.policy.actor_representation.values()
+        ]
+        lambda_values = torch.stack(
+            [comm.lambda_value.detach() for comm in comm_modules]
+        )
+        lambda_grads = [
+            comm.raw_lambda.grad.detach()
+            for comm in comm_modules
+            if comm.raw_lambda.grad is not None
+        ]
+        info["diagnostics/conflict_lambda"] = float(lambda_values.mean().item())
+        info["diagnostics/conflict_lambda_raw_grad"] = (
+            float(torch.stack(lambda_grads).abs().mean().item())
+            if lambda_grads
+            else 0.0
+        )
+        return info
 
 
 class CA_ComMAPPO_Agents(MAPPO_Agents):
@@ -181,12 +236,12 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
     def __init__(
         self,
         config: Namespace,
-        envs: Optional[DummyVecMultiAgentEnv | SubprocVecMultiAgentEnv] = None,
-        num_agents: Optional[int] = None,
-        agent_keys: Optional[List[str]] = None,
-        state_space: Optional[Space] = None,
-        observation_space: Optional[Space] = None,
-        action_space: Optional[Space] = None,
+        envs: DummyVecMultiAgentEnv | SubprocVecMultiAgentEnv | None = None,
+        num_agents: int | None = None,
+        agent_keys: list[str] | None = None,
+        state_space: Space | None = None,
+        observation_space: Space | None = None,
+        action_space: Space | None = None,
         callback=None,
     ):
         super().__init__(
@@ -224,6 +279,7 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
                 comm_dim=self.config.representation_hidden_size[-1],
                 recede_penalty=getattr(self.config, "recede_penalty", 10.0),
                 ttc_max=getattr(self.config, "ttc_max", TTC_MAX),
+                conflict_lambda_init=getattr(self.config, "conflict_lambda_init", 1.0),
                 use_conflict_prior=getattr(self.config, "use_conflict_prior", True),
             )
 
@@ -241,23 +297,23 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
             "PermutationInvariantAttention", space_critic_in, self.config
         )
 
-        policy_settings = dict(
-            action_space=self.action_space,
-            n_agents=self.n_agents,
-            representation_actor=a_representation,
-            representation_critic=c_representation,
-            actor_hidden_size=self.config.actor_hidden_size,
-            critic_hidden_size=self.config.critic_hidden_size,
-            normalize=normalize_fn,
-            initialize=initializer,
-            activation=activation,
-            device=device,
-            use_distributed_training=self.distributed_training,
-            use_parameter_sharing=self.use_parameter_sharing,
-            model_keys=self.model_keys,
-            use_rnn=self.use_rnn,
-            rnn=self.config.rnn if self.use_rnn else None,
-        )
+        policy_settings = {
+            "action_space": self.action_space,
+            "n_agents": self.n_agents,
+            "representation_actor": a_representation,
+            "representation_critic": c_representation,
+            "actor_hidden_size": self.config.actor_hidden_size,
+            "critic_hidden_size": self.config.critic_hidden_size,
+            "normalize": normalize_fn,
+            "initialize": initializer,
+            "activation": activation,
+            "device": device,
+            "use_distributed_training": self.distributed_training,
+            "use_parameter_sharing": self.use_parameter_sharing,
+            "model_keys": self.model_keys,
+            "use_rnn": self.use_rnn,
+            "rnn": self.config.rnn if self.use_rnn else None,
+        }
         policy = REGISTRY_Policy["CA_ComMAPPO_Policy"](**policy_settings)
         self.continuous_control = False
         return policy
