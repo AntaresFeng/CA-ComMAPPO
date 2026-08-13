@@ -8,7 +8,6 @@ from gymnasium import spaces
 from highway_env.envs.intersection_env import IntersectionEnv, MultiAgentIntersectionEnv
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
-
 DEFAULT_ENV_NAME = "HighwayIntersection"
 DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
@@ -112,12 +111,12 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
     def _validate_multi_agent_spaces(self) -> None:
         if not isinstance(self.env.observation_space, spaces.Tuple):
-            raise ValueError(
+            raise TypeError(
                 f"{self.env_id} observation_space is not Tuple; ensure "
                 "observation.type is MultiAgentObservation."
             )
         if not isinstance(self.env.action_space, spaces.Tuple):
-            raise ValueError(
+            raise TypeError(
                 f"{self.env_id} action_space is not Tuple; ensure "
                 "action.type is MultiAgentAction."
             )
@@ -145,7 +144,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
 
     def _flatten_box_space(self, space: spaces.Space) -> spaces.Box:
         if not isinstance(space, spaces.Box):
-            raise ValueError("flatten_observations requires Box observation spaces")
+            raise TypeError("flatten_observations requires Box observation spaces")
         return spaces.Box(
             low=np.asarray(space.low, dtype=np.float32).reshape(-1),
             high=np.asarray(space.high, dtype=np.float32).reshape(-1),
@@ -300,6 +299,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             agent: active_before_step[agent] and not bool(terminated[agent])
             for agent in self.agents
         }
+        info["next_agent_mask"] = dict(self._active_agents)
         self._remember_obs(obs_dict)
         return obs_dict, rewards, terminated, truncated, info
 

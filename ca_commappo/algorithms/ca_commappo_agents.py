@@ -16,8 +16,10 @@ input dim auto-includes the comm context). ``CA_ComMAPPO_Policy`` /
 from __future__ import annotations
 
 from argparse import Namespace
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import ExitStack, contextmanager
 
+import numpy as np
 import torch
 from gymnasium import Space
 from xuance.environment import (
@@ -40,7 +42,7 @@ from ca_commappo.algorithms.representations import (
     PermutationInvariantAttention,
 )
 
-CA_COMMUNICATION_CONTRACT_VERSION = 1
+CA_COMMUNICATION_CONTRACT_VERSION = 2
 
 
 class CAComMAPPOActorRep(Module):
@@ -78,6 +80,7 @@ class CAComMAPPOActorRep(Module):
         self.device = device
         self.n_agents = int(n_agents)
         self.ttc_max = float(ttc_max)
+        self._runtime_agent_mask: torch.Tensor | np.ndarray | None = None
 
         hidden = self.hidden_sizes[-1]
         self.comm_dim = int(comm_dim) if comm_dim is not None else hidden
@@ -104,6 +107,27 @@ class CAComMAPPOActorRep(Module):
         )
         self.output_shapes = {"state": (hidden + self.comm_dim,)}
 
+    @contextmanager
+    def communication_mask(self, agent_mask) -> Iterator[None]:
+        previous = self._runtime_agent_mask
+        self._runtime_agent_mask = agent_mask
+        try:
+            yield
+        finally:
+            self._runtime_agent_mask = previous
+
+    def _agent_mask(self, agent_mask, n_env: int) -> torch.Tensor:
+        source = self._runtime_agent_mask if agent_mask is None else agent_mask
+        if source is None:
+            return torch.ones(n_env, self.n_agents, device=self.device)
+        mask = torch.as_tensor(source, dtype=torch.float32, device=self.device)
+        if mask.numel() != n_env * self.n_agents:
+            raise ValueError(
+                "CA-ComMAPPO agent mask must contain one value per "
+                f"environment/agent pair, got shape {tuple(mask.shape)}."
+            )
+        return mask.reshape(n_env, self.n_agents)
+
     def _ttc_intent(self, ego: torch.Tensor):
         """ego: (..., 7) = [presence, x, y, vx, vy, cos_h, sin_h] (normalized)."""
         pos = ego[..., 1:3]
@@ -124,7 +148,7 @@ class CAComMAPPOActorRep(Module):
         intent = (~not_approaching).float()
         return ttc, intent
 
-    def forward(self, observations):
+    def forward(self, observations, agent_mask=None):
         x = torch.as_tensor(observations, dtype=torch.float32, device=self.device)
         if x.dim() == 1:
             x = x.unsqueeze(0)
@@ -148,7 +172,7 @@ class CAComMAPPOActorRep(Module):
             [z, ttc.unsqueeze(-1), intent.unsqueeze(-1)], dim=-1
         )  # (E, A, H+2)
 
-        alive = torch.ones(n_env, n_agents, device=self.device)
+        alive = self._agent_mask(agent_mask, n_env)
         c = self.comm(m, alive)  # (E, A, comm_dim)
 
         state = torch.cat([z, c], dim=-1)  # (E, A, H+comm_dim)
@@ -163,11 +187,29 @@ class CA_ComMAPPO_Policy(MAAC_Policy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._communication_agent_mask = None
         self.register_buffer(
             "_communication_contract_version",
             torch.tensor(CA_COMMUNICATION_CONTRACT_VERSION, dtype=torch.int64),
             persistent=True,
         )
+
+    @contextmanager
+    def communication_mask(self, agent_mask) -> Iterator[None]:
+        previous = self._communication_agent_mask
+        self._communication_agent_mask = agent_mask
+        try:
+            yield
+        finally:
+            self._communication_agent_mask = previous
+
+    def forward(self, *args, **kwargs):
+        with ExitStack() as stack:
+            for representation in self.actor_representation.values():
+                stack.enter_context(
+                    representation.communication_mask(self._communication_agent_mask)
+                )
+            return super().forward(*args, **kwargs)
 
     def load_state_dict(
         self,
@@ -200,7 +242,18 @@ class CA_ComMAPPO_Learner(MAPPO_Learner):
     yet, per design doc §9 future work)."""
 
     def update(self, sample):
-        info = super().update(sample)
+        sample_tensor = self.build_training_data(
+            sample=sample,
+            use_parameter_sharing=self.use_parameter_sharing,
+            use_actions_mask=self.use_actions_mask,
+            use_global_state=self.use_global_state,
+        )
+        key = self.model_keys[0]
+        communication_mask = sample_tensor["agent_mask"][key].reshape(
+            sample_tensor["batch_size"], self.n_agents
+        )
+        with self.policy.communication_mask(communication_mask):
+            info = super().update(sample)
         comm_modules = [
             representation.comm
             for representation in self.policy.actor_representation.values()
@@ -253,6 +306,101 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
             observation_space,
             action_space,
             callback,
+        )
+        self._rollout_agent_mask: np.ndarray | None = None
+
+    def _all_active_mask(self, n_env: int) -> np.ndarray:
+        return np.ones((n_env, self.n_agents), dtype=np.float32)
+
+    def _mask_from_infos(
+        self,
+        infos,
+        n_env: int,
+        *,
+        use_next_mask: bool = False,
+    ) -> np.ndarray:
+        if infos is None:
+            if self._rollout_agent_mask is None or self._rollout_agent_mask.shape != (
+                n_env,
+                self.n_agents,
+            ):
+                return self._all_active_mask(n_env)
+            return self._rollout_agent_mask.copy()
+        if len(infos) != n_env:
+            raise ValueError(
+                f"Expected {n_env} info entries for CA-ComMAPPO, got {len(infos)}."
+            )
+        mask = self._all_active_mask(n_env)
+        for i_env, info in enumerate(infos):
+            if "reset_obs" in info:
+                continue
+            if use_next_mask:
+                values = info.get("next_agent_mask", info.get("agent_mask"))
+            else:
+                values = info.get("agent_mask", info.get("next_agent_mask"))
+            if values is None:
+                continue
+            if isinstance(values, Mapping):
+                values = [values[key] for key in self.agent_keys]
+            values = np.asarray(values, dtype=np.float32).reshape(-1)
+            if values.size != self.n_agents:
+                raise ValueError(
+                    "CA-ComMAPPO info mask must contain one value per agent, "
+                    f"got {values.size}."
+                )
+            mask[i_env] = values
+        return mask
+
+    def action(
+        self,
+        obs_dict,
+        state=None,
+        avail_actions_dict=None,
+        rnn_hidden_actor=None,
+        rnn_hidden_critic=None,
+        test_mode=False,
+        info=None,
+        **kwargs,
+    ):
+        communication_mask = self._mask_from_infos(info, len(obs_dict))
+        with self.policy.communication_mask(communication_mask):
+            return super().action(
+                obs_dict=obs_dict,
+                state=state,
+                avail_actions_dict=avail_actions_dict,
+                rnn_hidden_actor=rnn_hidden_actor,
+                rnn_hidden_critic=rnn_hidden_critic,
+                test_mode=test_mode,
+                **kwargs,
+            )
+
+    def store_experience(
+        self,
+        obs_dict,
+        avail_actions,
+        actions_dict,
+        log_pi_a,
+        rewards_dict,
+        values_dict,
+        terminals_dict,
+        info,
+        **kwargs,
+    ) -> None:
+        super().store_experience(
+            obs_dict,
+            avail_actions,
+            actions_dict,
+            log_pi_a,
+            rewards_dict,
+            values_dict,
+            terminals_dict,
+            info,
+            **kwargs,
+        )
+        self._rollout_agent_mask = self._mask_from_infos(
+            info,
+            len(obs_dict),
+            use_next_mask=True,
         )
 
     def _build_policy(self) -> Module:

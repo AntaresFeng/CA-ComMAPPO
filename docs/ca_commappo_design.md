@@ -54,7 +54,8 @@ attention、无冲突先验”的消融。masked softmax 排除自身和失活�
 上述公式描述的是当前代码，而不是理想化版本：query 和 key 都读取完整消息，intent
 是硬二值。
 
-通信合同随 checkpoint 持久化为版本 `1`。版本 1 表示有界 TTC 与非负 lambda；缺少
+通信合同随 checkpoint 持久化为版本 `2`。版本 2 表示有界 TTC、非负 lambda 和真实
+agent mask 通信；缺少
 版本字段、包含旧 `comm.lam` 参数或版本不匹配的 CA-ComMAPPO checkpoint 会被明确
 拒绝。旧模型只允许保留为历史证据，不能迁移或用于正式对比。
 
@@ -70,8 +71,10 @@ attention、无冲突先验”的消融。masked softmax 排除自身和失活�
 | `CA_ComMAPPO_Agents` | 同上 | 构造 actor/critic representation 和 policy |
 | `register_components()` | `ca_commappo/algorithms/registration.py` | 运行时注册 XuanCe 组件 |
 
-通信折叠在 actor representation 中，因此不用修改 XuanCe 的 policy forward、buffer
-或 learner。critic 使用独立的 permutation-invariant representation，不接收通信上下文。
+通信折叠在 actor representation 中。自定义 policy 用同步 context 把 rollout 或
+minibatch 的 agent mask 传入 representation；自定义 learner 只建立 mask context 后调用
+原 MAPPO update，不复制 PPO loss。critic 使用独立的 permutation-invariant
+representation，不接收通信上下文。
 
 ## 观测与可比性前提
 
@@ -88,11 +91,7 @@ attention、无冲突先验”的消融。masked softmax 排除自身和失活�
 
 以下问题尚未解决，不能把当前 CA-ComMAPPO 结果作为最终论文证据：
 
-1. `CAComMAPPOActorRep.forward()` 当前传入全 1 alive mask；inactive agent 的旧消息
-   仍可能影响 active agent。应从 rollout 信息传递真实 agent mask。
-2. 现有测试覆盖模块形状、mask 和先验单调性，但缺少构造完整 agent 后执行真实环境
-   action/update 的端到端回归。
-3. 车辆数量变化会同时改变 agent identity 和 critic 输入形状；在完成 checkpoint
+1. 车辆数量变化会同时改变 agent identity 和 critic 输入形状；在完成 checkpoint
    兼容方案前，不得宣称模型可直接从 4 辆泛化到 6/8/10 辆。
 
 修复这些问题属于算法变更，必须单独提交、通过完整测试和 smoke，再启动 CA-ComMAPPO

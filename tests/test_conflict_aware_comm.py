@@ -126,6 +126,8 @@ class TestAttentionNormalization:
         alive[0, 1] = 0.0  # agent 1 dead -> nobody attends to it
         alpha = comm.attention(m, alive)
         assert torch.allclose(alpha[:, :, 1], torch.zeros(1, N_AGENTS), atol=1e-6)
+        assert torch.allclose(alpha[:, 1, :], torch.zeros(1, N_AGENTS), atol=1e-6)
+        assert torch.allclose(comm(m, alive)[:, 1, :], torch.zeros(1, COMM_DIM))
 
 
 class TestConflictPriorMonotonicity:

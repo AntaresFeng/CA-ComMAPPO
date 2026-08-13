@@ -127,9 +127,10 @@ class ConflictAwareComm(Module):
 
         alive = self._alive_2d(alive_ally, n_env, n_agents, device)  # (E, A)
         alive_j = alive[:, None, :].expand(n_env, n_agents, n_agents).bool()
+        alive_i = alive[:, :, None].expand(n_env, n_agents, n_agents).bool()
         eye = torch.eye(n_agents, device=device, dtype=torch.bool)
         self_mask = eye[None].expand(n_env, n_agents, n_agents)
-        valid = (~self_mask) & alive_j  # j != i and alive
+        valid = (~self_mask) & alive_i & alive_j
         neg_inf = torch.finfo(scores.dtype).min
         scores = scores.masked_fill(~valid, neg_inf)
         return scores, v, valid

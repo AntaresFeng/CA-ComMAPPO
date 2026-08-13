@@ -77,6 +77,32 @@ class TestOutputContract:
         assert out["state"].shape == (2, 32)
         assert torch.isfinite(out["state"]).all()
 
+    def test_inactive_agent_cannot_send_or_receive_messages(self):
+        rep = _build_rep(n_agents=3, hidden=16)
+        obs = _obs_for_agents(
+            [
+                _ego_row(1.0, 0.0, -1.0, 0.0, -1.0, 0.0),
+                _ego_row(0.0, 1.0, 0.0, -1.0, 0.0, -1.0),
+                _ego_row(-1.0, 0.0, 1.0, 0.0, 1.0, 0.0),
+            ]
+        )
+        mask = torch.tensor([[1.0, 1.0, 0.0]])
+        baseline = rep(obs, agent_mask=mask)["state"].reshape(1, 3, 32)
+
+        changed = obs.clone()
+        changed[2] = torch.randn_like(changed[2]) * 100.0
+        mutated = rep(changed, agent_mask=mask)["state"].reshape(1, 3, 32)
+
+        assert torch.allclose(baseline[:, :2], mutated[:, :2])
+        assert torch.equal(baseline[:, 2, 16:], torch.zeros(1, 16))
+
+    def test_runtime_mask_context_is_restored_after_exit(self):
+        rep = _build_rep(n_agents=2, hidden=16)
+        mask = torch.tensor([[1.0, 0.0]])
+        with rep.communication_mask(mask):
+            assert rep._runtime_agent_mask is mask
+        assert rep._runtime_agent_mask is None
+
 
 class TestTTCIntent:
     def test_approaching_ego_gets_finite_ttc_and_intent_one(self):

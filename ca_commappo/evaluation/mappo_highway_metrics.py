@@ -1,6 +1,7 @@
-from copy import deepcopy
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any, Callable, Iterator, Sequence
+from copy import deepcopy
+from typing import Any
 
 from xuance.common import MultiAgentBaseCallback
 
@@ -38,6 +39,15 @@ class HighwayMetricsCallback(MultiAgentBaseCallback):
             self._logger(summary_to_log_infos(self.log_prefix, summary), current_step)
 
 
+def _info_for_next_action(info: dict[str, Any]) -> dict[str, Any]:
+    action_info = deepcopy(info)
+    if "reset_obs" in action_info:
+        action_info["agent_mask"] = {agent: True for agent in action_info["reset_obs"]}
+    elif "next_agent_mask" in action_info:
+        action_info["agent_mask"] = dict(action_info["next_agent_mask"])
+    return action_info
+
+
 def evaluate_highway_policy(
     *,
     agents: Any,
@@ -54,9 +64,7 @@ def evaluate_highway_policy(
 
     num_envs = int(envs.num_envs)
     if record_once_per_env and test_episodes > num_envs:
-        raise ValueError(
-            "record_once_per_env requires test_episodes <= envs.num_envs"
-        )
+        raise ValueError("record_once_per_env requires test_episodes <= envs.num_envs")
     if episode_seeds is not None:
         if not record_once_per_env:
             raise ValueError("episode_seeds requires record_once_per_env=True")
@@ -71,7 +79,8 @@ def evaluate_highway_policy(
     use_global_state = getattr(agents, "use_global_state", False)
     use_rnn = getattr(agents, "use_rnn", False)
 
-    obs_dict, _info = envs.reset()
+    obs_dict, reset_infos = envs.reset()
+    current_infos = [_info_for_next_action(info) for info in reset_infos]
     avail_actions = envs.buf_avail_actions if use_actions_mask else None
     state = envs.buf_state if use_global_state else None
     rnn_hidden_actor, rnn_hidden_critic = _init_rnn_hidden(agents, num_envs, use_rnn)
@@ -88,6 +97,7 @@ def evaluate_highway_policy(
                 rnn_hidden_actor=rnn_hidden_actor,
                 rnn_hidden_critic=rnn_hidden_critic,
                 test_mode=True,
+                info=current_infos,
             )
         rnn_hidden_actor = policy_out.get("rnn_hidden_actor")
         rnn_hidden_critic = policy_out.get("rnn_hidden_critic")
@@ -96,6 +106,7 @@ def evaluate_highway_policy(
         )
         next_state = envs.buf_state if use_global_state else None
         next_avail_actions = envs.buf_avail_actions if use_actions_mask else None
+        current_infos = [_info_for_next_action(info) for info in infos]
 
         obs_dict = deepcopy(next_obs_dict)
         avail_actions = deepcopy(next_avail_actions)
@@ -118,9 +129,7 @@ def evaluate_highway_policy(
                         truncated=bool(truncated[i_env]),
                         score=score,
                         seed=(
-                            None
-                            if episode_seeds is None
-                            else int(episode_seeds[i_env])
+                            None if episode_seeds is None else int(episode_seeds[i_env])
                         ),
                         env_id=i_env,
                     )

@@ -390,6 +390,11 @@ def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
             "agent_2": True,
         }
         assert agent_mask == {agent: True for agent in env.agents}
+        assert step_info["next_agent_mask"] == {
+            "agent_0": True,
+            "agent_1": False,
+            "agent_2": False,
+        }
 
         _obs, rewards, _terminated, _truncated, step_info = env.step(
             {agent: 1 for agent in env.agents}
@@ -397,6 +402,11 @@ def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
 
         assert env.agent_mask() == {
             "agent_0": True,
+            "agent_1": False,
+            "agent_2": False,
+        }
+        assert step_info["next_agent_mask"] == {
+            "agent_0": False,
             "agent_1": False,
             "agent_2": False,
         }
@@ -454,9 +464,7 @@ def test_arrival_and_termination_remain_sticky_when_agents_arrive_sequentially(
         assert info["agents_terminated"] == (True, False)
         assert info["global_terminated"] is False
 
-        _obs, rewards, terminated, truncated, info = env.step(
-            {"agent_1": 1}
-        )
+        _obs, rewards, terminated, truncated, info = env.step({"agent_1": 1})
 
         assert rewards == {"agent_0": 0.0, "agent_1": 10.0}
         assert terminated == {"agent_0": True, "agent_1": True}

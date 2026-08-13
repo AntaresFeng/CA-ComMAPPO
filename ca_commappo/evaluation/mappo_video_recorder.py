@@ -9,7 +9,6 @@ from typing import Any
 import numpy as np
 from gymnasium.wrappers import RecordVideo
 
-from ca_commappo.evaluation.mappo_eval_artifacts import json_safe
 from ca_commappo.envs.highway_intersection_wrapper import (
     HighwayIntersectionMultiAgentEnv,
 )
@@ -17,7 +16,9 @@ from ca_commappo.evaluation.highway_metrics import (
     build_episode_record,
     summarize_episode_records,
 )
+from ca_commappo.evaluation.mappo_eval_artifacts import json_safe
 from ca_commappo.evaluation.mappo_highway_metrics import (
+    _info_for_next_action,
     deterministic_policy_sampling,
 )
 
@@ -73,12 +74,14 @@ def _agent_action_for_single_env(
     obs: dict[str, Any],
     rnn_hidden_actor: Any,
     rnn_hidden_critic: Any,
+    info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     action_kwargs = {
         "obs_dict": [deepcopy(obs)],
         "rnn_hidden_actor": rnn_hidden_actor,
         "rnn_hidden_critic": rnn_hidden_critic,
         "test_mode": True,
+        "info": None if info is None else [_info_for_next_action(info)],
     }
     if getattr(agents, "use_global_state", False):
         action_kwargs["state"] = [env.state()]
@@ -229,6 +232,7 @@ def record_mappo_policy_videos(
             rnn_hidden_actor, rnn_hidden_critic = _init_single_env_rnn_hidden(agents)
             seed = int(base_seed) + episode_index
             obs, _info = recording_env.reset(seed=seed)
+            current_info = {"agent_mask": recording_env.agent_mask()}
             recording_env.render("rgb_array")
             agent_rewards = {agent: 0.0 for agent in recording_env.agents}
             latest_info: dict[str, Any] = {}
@@ -243,12 +247,14 @@ def record_mappo_policy_videos(
                     obs,
                     rnn_hidden_actor,
                     rnn_hidden_critic,
+                    current_info,
                 )
                 rnn_hidden_actor = policy_out.get("rnn_hidden_actor")
                 rnn_hidden_critic = policy_out.get("rnn_hidden_critic")
                 obs, rewards, terminated, truncated, latest_info = recording_env.step(
                     policy_out["actions"][0]
                 )
+                current_info = latest_info
                 recording_env.render("rgb_array")
                 steps += 1
                 for agent, reward in rewards.items():
@@ -486,14 +492,13 @@ def _title_frame(label: str) -> np.ndarray:
 
 
 def _temporary_video_path(output: Path) -> Path:
-    handle = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         delete=False,
         dir=output.parent,
         prefix=f".{output.stem}-",
         suffix=output.suffix or ".tmp",
-    )
-    handle.close()
-    return Path(handle.name)
+    ) as handle:
+        return Path(handle.name)
 
 
 def _unlink_if_exists(path: Path) -> None:

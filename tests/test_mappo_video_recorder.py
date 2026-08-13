@@ -2,6 +2,7 @@ import json
 from argparse import Namespace
 from contextlib import contextmanager
 from pathlib import Path
+from typing import ClassVar
 
 import cv2
 import numpy as np
@@ -80,9 +81,7 @@ def test_cli_overrides_includes_explicit_record_video():
 
 
 def test_cli_overrides_accepts_tensorboard_logger_for_local_runs():
-    overrides = cli_overrides(
-        build_parser().parse_args(["--logger", "tensorboard"])
-    )
+    overrides = cli_overrides(build_parser().parse_args(["--logger", "tensorboard"]))
 
     assert overrides["logger"] == "tensorboard"
 
@@ -161,7 +160,12 @@ def test_single_env_video_action_uses_deterministic_policy_sampling(monkeypatch)
     )
 
     result = video_recorder._agent_action_for_single_env(
-        Agent(), object(), {"agent_0": np.zeros(1)}, None, None
+        Agent(),
+        object(),
+        {"agent_0": np.zeros(1)},
+        None,
+        None,
+        {"next_agent_mask": {"agent_0": False}},
     )
 
     assert result["actions"][0]["agent_0"] == 1
@@ -211,9 +215,9 @@ def test_preview_frame_uses_final_low_contrast_frame(tmp_path):
 
 
 class FakeSingleEnv:
-    agents = ["agent_0", "agent_1"]
+    agents: ClassVar[list[str]] = ["agent_0", "agent_1"]
     max_episode_steps = 4
-    instances = []
+    instances: ClassVar[list["FakeSingleEnv"]] = []
 
     def __init__(self, _configs):
         self.reset_calls = []
@@ -239,6 +243,9 @@ class FakeSingleEnv:
     def avail_actions(self):
         return None
 
+    def agent_mask(self):
+        return {agent: True for agent in self.agents}
+
     def step(self, action):
         assert action == {"agent_0": 1, "agent_1": 1}
         self.step_calls += 1
@@ -247,6 +254,10 @@ class FakeSingleEnv:
             "arrived": (self.step_calls >= 2, self.step_calls >= 2),
             "waiting_steps": (1, 2),
             "dt": 0.2,
+            "next_agent_mask": {
+                "agent_0": self.step_calls < 2,
+                "agent_1": self.step_calls < 2,
+            },
         }
         rewards = {"agent_0": 1.0, "agent_1": 2.0}
         terminated = {
@@ -257,7 +268,6 @@ class FakeSingleEnv:
 
     def render(self, *_args, **_kwargs):
         self.render_calls += 1
-        return None
 
     def close(self):
         self.closed = True
@@ -268,8 +278,12 @@ class FakeAgentForVideo:
     use_actions_mask = False
     use_rnn = False
 
+    def __init__(self):
+        self.action_infos = []
+
     def action(self, **kwargs):
         assert kwargs["test_mode"] is True
+        self.action_infos.append(kwargs["info"])
         return {
             "actions": [{"agent_0": 1, "agent_1": 1}],
             "rnn_hidden_actor": None,
@@ -281,6 +295,7 @@ class FakeRnnAgentForVideo(FakeAgentForVideo):
     use_rnn = True
 
     def __init__(self):
+        super().__init__()
         self.init_calls = []
         self.seen_actor_hidden = []
 
@@ -323,9 +338,10 @@ def test_record_mappo_policy_videos_collects_records_and_summary(tmp_path, monke
 
     _patch_video_rollout(monkeypatch, fake_record_video)
 
+    agents = FakeAgentForVideo()
     result = record_mappo_policy_videos(
         configs=Namespace(seed=7, render_mode="rgb_array"),
-        agents=FakeAgentForVideo(),
+        agents=agents,
         model_path="models/best_model.pth",
         video_dir=tmp_path,
         episode_count=2,
@@ -349,6 +365,19 @@ def test_record_mappo_policy_videos_collects_records_and_summary(tmp_path, monke
     fake_env = FakeSingleEnv.instances[-1]
     assert fake_env.wrapper is fake_env
     assert fake_env.render_calls == 6
+    assert agents.action_infos[0] == [
+        {"agent_mask": {"agent_0": True, "agent_1": True}}
+    ]
+    assert agents.action_infos[1] == [
+        {
+            "crashed": (False, False),
+            "arrived": (False, False),
+            "waiting_steps": (1, 2),
+            "dt": 0.2,
+            "next_agent_mask": {"agent_0": True, "agent_1": True},
+            "agent_mask": {"agent_0": True, "agent_1": True},
+        }
+    ]
 
 
 def test_record_mappo_policy_videos_rejects_stale_extra_video(tmp_path, monkeypatch):

@@ -1,12 +1,34 @@
+from typing import ClassVar
+
 import torch
 from xuance.torch.utils.distributions import CategoricalDistribution
 
 from ca_commappo.evaluation.mappo_highway_metrics import (
     HighwayMetricsCallback,
+    _info_for_next_action,
     deterministic_policy_sampling,
     evaluate_highway_policy,
     is_better_highway_summary,
 )
+
+
+def test_next_action_info_promotes_post_step_mask_and_resets_all_agents():
+    partial = _info_for_next_action(
+        {
+            "agent_mask": {"agent_0": True, "agent_1": True},
+            "next_agent_mask": {"agent_0": True, "agent_1": False},
+        }
+    )
+    reset = _info_for_next_action(
+        {
+            "agent_mask": {"agent_0": False, "agent_1": False},
+            "next_agent_mask": {"agent_0": False, "agent_1": False},
+            "reset_obs": {"agent_0": 0, "agent_1": 0},
+        }
+    )
+
+    assert partial["agent_mask"] == {"agent_0": True, "agent_1": False}
+    assert reset["agent_mask"] == {"agent_0": True, "agent_1": True}
 
 
 def test_evaluate_highway_policy_collects_records_summary_and_logs_scalars():
@@ -27,6 +49,7 @@ def test_evaluate_highway_policy_collects_records_summary_and_logs_scalars():
     assert result["summary"]["collision_rate"] == 0.0
     assert result["episodes"][0]["episode_reward"] == 2.0
     assert result["episodes"][0]["arrived_agents"] == [True, True]
+    assert agent.action_infos == [[{"agent_mask": {"agent_0": True, "agent_1": True}}]]
     assert agent.logged[-1] == (
         {
             "Eval-Highway/episodes": 1.0,
@@ -155,7 +178,7 @@ def test_deterministic_sampling_uses_argmax_without_advancing_torch_rng():
 
 
 class FakeAgent:
-    agent_keys = ["agent_0", "agent_1"]
+    agent_keys: ClassVar[list[str]] = ["agent_0", "agent_1"]
     use_actions_mask = False
     use_global_state = False
     use_rnn = False
@@ -163,12 +186,14 @@ class FakeAgent:
 
     def __init__(self):
         self.logged = []
+        self.action_infos = []
 
     def action(self, *, obs_dict, state, avail_actions_dict, test_mode, **_kwargs):
         assert test_mode
         assert obs_dict == [{"agent_0": 0, "agent_1": 0}]
         assert state is None
         assert avail_actions_dict is None
+        self.action_infos.append(_kwargs["info"])
         return {
             "actions": [{"agent_0": 1, "agent_1": 1}],
             "rnn_hidden_actor": None,
@@ -181,7 +206,7 @@ class FakeAgent:
 
 class FakeVecEnv:
     num_envs = 1
-    agents = ["agent_0", "agent_1"]
+    agents: ClassVar[list[str]] = ["agent_0", "agent_1"]
 
     def __init__(self):
         self.buf_obs = [{"agent_0": 0, "agent_1": 0}]
@@ -190,7 +215,7 @@ class FakeVecEnv:
 
     def reset(self):
         self.buf_obs = [{"agent_0": 0, "agent_1": 0}]
-        return self.buf_obs, [{}]
+        return self.buf_obs, [{"agent_mask": {"agent_0": True, "agent_1": True}}]
 
     def step(self, actions):
         assert actions == [{"agent_0": 1, "agent_1": 1}]
@@ -213,7 +238,7 @@ class FakeVecEnv:
 
 
 class TwoEnvAgent:
-    agent_keys = ["agent_0"]
+    agent_keys: ClassVar[list[str]] = ["agent_0"]
     use_actions_mask = False
     use_global_state = False
     use_rnn = False
