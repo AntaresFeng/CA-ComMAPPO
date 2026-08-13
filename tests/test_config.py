@@ -1,5 +1,9 @@
 from ca_commappo.config import derive_training_env_seed, load_configs
 from ca_commappo.envs.highway_intersection_wrapper import DEFAULT_HIGHWAY_ENV_ID
+from ca_commappo.evaluation.model_provenance import (
+    canonical_json_sha256,
+    canonical_training_config,
+)
 from ca_commappo.training.train_highway_intersection import build_parser, cli_overrides
 
 
@@ -76,21 +80,11 @@ def test_training_env_seed_yaml_or_override_cannot_break_seed_mapping():
     assert configs.env_seed == 2_000_000
 
 
-def test_promoted_default_matches_the_retained_iteration_five_config():
-    baseline = vars(load_configs(DEFAULT_HIGHWAY_ENV_ID, agent="mappo"))
-    retained_iteration = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/"
-                "intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml"
-            ),
-        )
-    )
+def test_default_mappo_preserves_the_published_training_contract():
+    configs = load_configs(DEFAULT_HIGHWAY_ENV_ID, agent="mappo")
+    configs.n_agents = 4
+    configs.episode_length = 100
 
-    differences = {
-        key
-        for key in baseline.keys() | retained_iteration.keys()
-        if baseline.get(key) != retained_iteration.get(key)
-    }
-    assert differences == {"config_path", "output_dir"}
+    assert canonical_json_sha256(canonical_training_config(configs)) == (
+        "d942c76c83d9a8b58a3100fbf3034182f4b25b3ec705ccd7241c00ca4256d699"
+    )

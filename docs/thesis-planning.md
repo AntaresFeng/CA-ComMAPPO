@@ -1,3 +1,6 @@
+> 实验与论文中的 MAPPO 固定基线见 [`mappo_baseline.md`](mappo_baseline.md)。本文只
+> 描述研究主线，不覆盖该文档冻结的任务、训练和评估合同。
+
 我的建议是：**主线不要从 MADDPG 起步，而是从 MAPPO 起步；创新算法构建在“Permutation-invariant Attention-MAPPO + 显式通信模块”之上。**
 
 原因很直接：`highway-env` 的 `intersection-v0` 本身是无信号路口密集交通任务，默认动作是 `DiscreteMetaAction`，多智能体版本也可以通过 `controlled_vehicles`、`MultiAgentAction`、`MultiAgentObservation` 配置出来；这类离散决策、同质车辆、合作通过路口的任务，更适合先用 MAPPO/IPPO 体系做稳定基线。([highway-env.farama.org][1]) MAPPO 论文也说明，PPO 系列在合作多智能体任务中是很强的实用基线。([arXiv][2])

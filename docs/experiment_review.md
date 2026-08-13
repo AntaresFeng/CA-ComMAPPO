@@ -1,5 +1,9 @@
 # 实验设计评审报告（Experiment Design Review）
 
+> **历史快照**：本文记录 2026-07-23 的设计状态，其中奖励、车辆数和 PPO 超参已经
+> 被后续实验替换。不得从本文复制当前实验配置；后续实验和论文统一以
+> `docs/mappo_baseline.md` 及 canonical YAML 为准。其余算法设计发现保留作审计参考。
+
 > 归档日期：2026-07-23。分支 `nice-try`。
 > 评审对象：CA-ComMAPPO（Conflict-Aware Communication MAPPO）创新算法及其基线/消融矩阵。
 > 评审方法：7 个维度 reviewer + 逐条对抗验证（adversarial verify）+ 完整性补充，共 63 个 agent、51 条确认发现、4 条被否决。关键结论均经独立读码与实跑环境验证。

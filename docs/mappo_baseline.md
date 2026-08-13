@@ -46,6 +46,12 @@ contract SHA-256：
 当前只有 seed 1，尚不满足三 seed 的最终论文验收条件；后续算法对比必须使用相同任务
 配置、预算、训练 seed block 和固定选择/final 协议。
 
+机器可读证据集中在：
+
+- `results/mappo_baseline_seed1_provenance.json`
+- `results/mappo_baseline_seed1_final_manifest.json`
+- `results/mappo_baseline_seed1_comparison.csv`
+
 ## 复现命令
 
 正式训练必须在独立 tmux 中运行 benchmark，并保持 W&B 离线：

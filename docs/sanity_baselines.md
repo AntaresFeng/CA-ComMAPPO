@@ -93,26 +93,23 @@ uv run python -m ca_commappo.cli.run_sanity_baseline \
 不能只覆盖 base 或 count 其中一个。正式横向对比也不得在看到结果后换 seed
 集合。
 
-### 2026-08-07 Reference Run
+### Canonical Reference Run
 
 使用上述原样命令和 `20000..20099` 得到：
 
 | policy | episodes | arrival | collision | truncation | mean reward |
 |---|---:|---:|---:|---:|---:|
-| random | 100 | 0.09 | 0.75 | 0.16 | 5.8179 |
-| idle-only | 100 | 0.17 | 0.83 | 0.00 | 9.8589 |
+| random | 100 | 0.10 | 0.75 | 0.15 | -12.4574 |
+| idle-only | 100 | 0.17 | 0.83 | 0.00 | -16.1293 |
 
 可聚合产物位于：
 
-- `runs/random_highway/20260807_220901_727594_test_seed_1/`
-- `runs/idle_only_highway/20260807_220901_727594_test_seed_1/`
-- 合并可读 JSON：`results/sanity_highway_final_20000_20099_v3.json`
+- `runs/random_highway/20260810_220643_345839_test_seed_1/`
+- `runs/idle_only_highway/20260810_220643_345839_test_seed_1/`
+- 严格对比表：`results/mappo_baseline_seed1_comparison.csv`
 
-较早的 `20260807_215507_416408_test_seed_1` 和
-`20260807_220019_158621_test_seed_1` 目录均被保留并标记为 superseded：前者
-episode payload 缺少显式 `score`；后者虽修复 score contract，但 random 动作
-RNG 直接复用了 episode seed，且把 seeded-random 错标为 deterministic。两者都
-不得进入最终聚合。
+这两个 run 使用 canonical MAPPO baseline 的奖励合同，并与 learned policy 共用
+`20000..20099`。更早、协议不完整或旧奖励口径的 sanity runs 已清理，不得用于论文。
 
 ## YAML Protocol
 

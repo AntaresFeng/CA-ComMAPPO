@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "status": "canonical_baseline_reference_complete",
+  "baseline": "mappo",
+  "training_seed": 1,
+  "training_env_seed": 1000000,
+  "training_env_seed_scheme": "training_seed_times_1000000",
+  "canonical_configuration": {
+    "algorithm_config": "configs/mappo/intersection-multi-agent-v1.yaml",
+    "environment_config": "configs/highway/intersection-multi-agent-v1.yaml",
+    "shared_training_config": "configs/common.yaml",
+    "training_contract_sha256": "d942c76c83d9a8b58a3100fbf3034182f4b25b3ec705ccd7241c00ca4256d699",
+    "runtime_source_sha256": "dda9ae90dc7e4138194f9520013350e35909870289f61049c32c4e5ffcc49728",
+    "running_steps": 1000000,
+    "parallels": 16,
+    "buffer_size": 2048,
+    "n_epochs": 5,
+    "n_minibatch": 2,
+    "ent_coef": 0.03,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "collision_reward": -40,
+    "high_speed_reward": 0.01,
+    "arrived_reward": 10
+  },
+  "benchmark": {
+    "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260810_220913_630764_benchmark_seed_1/",
+    "launch_log": "runs/launch_logs/mappo_baseline_seed1.log",
+    "wandb_mode": "offline",
+    "selected_epoch": 89,
+    "selected_step": 890000,
+    "checkpoint_sha256": "b1ee3493b7d34a35960e96d5c12791a70e975cea923d5cc6e95da3452cf5697e",
+    "selection_episode_seed_range": [
+      10000,
+      10049
+    ],
+    "selection_episodes": 50,
+    "selection_summary": {
+      "arrival_rate": 0.28,
+      "collision_rate": 0.04,
+      "truncation_rate": 0.68,
+      "mean_episode_reward": 7.038777325564229,
+      "mean_agent_arrival_fraction": 0.75
+    }
+  },
+  "final_validation": {
+    "run_directory": "runs/mappo_epochs5_ent03_reward_ordering_highway/20260811_195920_893803_test_seed_1/",
+    "launch_log": "runs/launch_logs/mappo_baseline_seed1_final.log",
+    "episode_seed_range": [
+      20000,
+      20099
+    ],
+    "episodes": 100,
+    "summary": {
+      "arrival_rate": 0.38,
+      "collision_rate": 0.01,
+      "truncation_rate": 0.61,
+      "mean_episode_reward": 8.175814524483062,
+      "mean_agent_arrival_fraction": 0.8025
+    },
+    "eval_metadata_sha256": "3647edceaaa9ec3ec87185a7d6818aea88eba3d128329d596e9940e8a44e6084",
+    "eval_records_sha256": "8e0f8bc4fdce4641b63b867b1a7941ee1eda88cf87423940dff99ad72fadfb81",
+    "video_episode_seed_range": [
+      20000,
+      20005
+    ],
+    "video_count": 6,
+    "video_summary_sha256": "2bc8126b0aacec65b6edba7bc88d0000658439c8936958674e7fb33bf1c6274b",
+    "combined_video_sha256": "ea078bb7be91bdd5c8c4bd07e1744b023430ef14e8bf176eeb4d08309a580edd"
+  },
+  "sanity_baselines": {
+    "random_run_directory": "runs/random_highway/20260810_220643_345839_test_seed_1/",
+    "idle_only_run_directory": "runs/idle_only_highway/20260810_220643_345839_test_seed_1/",
+    "random": {
+      "arrival_rate": 0.1,
+      "collision_rate": 0.75,
+      "truncation_rate": 0.15,
+      "mean_episode_reward": -12.457392670510874
+    },
+    "idle_only": {
+      "arrival_rate": 0.17,
+      "collision_rate": 0.83,
+      "truncation_rate": 0.0,
+      "mean_episode_reward": -16.12932182880713
+    }
+  },
+  "strict_final_manifest": "results/mappo_baseline_seed1_final_manifest.json",
+  "strict_comparison_csv": "results/mappo_baseline_seed1_comparison.csv",
+  "note": "Retained run directories keep their historical names so checkpoint provenance remains immutable; they are the canonical MAPPO baseline artifacts."
+}

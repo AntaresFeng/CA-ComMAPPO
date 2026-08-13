@@ -1,5 +1,9 @@
 # 实验执行手册（Experiments Runbook）
 
+MAPPO 及后续算法的共享任务/训练合同以
+[`mappo_baseline.md`](mappo_baseline.md) 为准；旧迭代专用 YAML 已删除，不得从历史
+commit 或旧 run metadata 复制配置重新启用。
+
 > 覆盖执行提示词 `docs/ai-exec-thesis-prompt.md` 阶段 4/5 的实验矩阵与结果收集。
 > 训练执行模式：AI 负责实现、smoke、正式运行和归档；长任务使用具名 tmux
 > session（远端集群可用等价调度器）。
