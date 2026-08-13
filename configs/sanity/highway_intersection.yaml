@@ -4,13 +4,6 @@ episodes: 1
 seeds: [1, 2, 3, 4, 5]
 policies: ["random", "idle-only"]
 
-highway_config:
-  controlled_vehicles: 4
-  policy_frequency: 5
-  duration: 20
-  initial_vehicle_count: 0
-  spawn_probability: 0
-  destination: null
-  arrived_reward: 5
-  collision_reward: -10
-  normalize_reward: false
+# Reuse the canonical task definition instead of maintaining a second reward
+# snapshot that can drift from learned-policy experiments.
+highway_config_path: "../highway/intersection-multi-agent-v1.yaml"

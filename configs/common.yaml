@@ -37,15 +37,17 @@ use_actions_mask: false
 seed: 1
 parallels: 16
 buffer_size: 2048
-n_epochs: 2
+n_epochs: 5
 n_minibatch: 2
 learning_rate: 0.0003
 weight_decay: 0
 vf_coef: 0.5
-ent_coef: 0.01
+ent_coef: 0.03
 target_kl: 0.25
 clip_range: 0.2
 clip_type: 1
+# Canonical MAPPO baseline discount contract shared by subsequent algorithms
+# and paper comparisons.
 gamma: 0.99
 
 use_linear_lr_decay: false

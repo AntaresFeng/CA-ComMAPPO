@@ -58,6 +58,9 @@ uv run python main.py mappo --config configs/mappo/intersection-multi-agent-v1.y
 
 ## MAPPO 模型验证与视频录制
 
+后续实验和论文使用的固定配置及 seed 1 参考结果见
+[Canonical MAPPO baseline](docs/mappo_baseline.md)。
+
 完整使用说明见
 [MAPPO 模型验证与视频录制](docs/mappo_model_evaluation_and_video.md)，包括
 checkpoint 与配置匹配、正式验证指标、视频参数、产物目录和复现规则。

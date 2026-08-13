@@ -10,11 +10,19 @@ def test_load_configs_composes_common_environment_and_algorithm_layers():
     assert configs.seed == 1
     assert configs.env_seed == 1_000_000
     assert configs.running_steps == 1_000_000
+    assert configs.n_epochs == 5
+    assert configs.ent_coef == 0.03
+    assert configs.gamma == 0.99
+    assert configs.gae_lambda == 0.95
     assert configs.highway_config["controlled_vehicles"] == 4
     assert configs.highway_config["policy_frequency"] == 5
     assert configs.highway_config["initial_vehicle_count"] == 0
     assert configs.highway_config["spawn_probability"] == 0
     assert configs.highway_config["destination"] is None
+    assert configs.highway_config["collision_reward"] == -40
+    assert configs.highway_config["high_speed_reward"] == 0.01
+    assert configs.highway_config["arrived_reward"] == 10
+    assert configs.highway_config["normalize_reward"] is False
     assert (
         configs.highway_config["observation"]["observation_config"]["vehicles_count"]
         == 15
@@ -68,96 +76,9 @@ def test_training_env_seed_yaml_or_override_cannot_break_seed_mapping():
     assert configs.env_seed == 2_000_000
 
 
-def test_epochs5_iteration_changes_only_epochs_and_output_identity():
-    control = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/intersection-multi-agent-v1-robust-eval.yaml"
-            ),
-        )
-    )
-    iteration = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path="configs/mappo/intersection-multi-agent-v1-epochs5.yaml",
-        )
-    )
-
-    differences = {
-        key
-        for key in control.keys() | iteration.keys()
-        if control.get(key) != iteration.get(key)
-    }
-    assert differences == {"config_path", "n_epochs", "output_dir"}
-    assert control["n_epochs"] == 2
-    assert iteration["n_epochs"] == 5
-
-
-def test_entropy_iteration_changes_only_entropy_and_output_identity():
-    control = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path="configs/mappo/intersection-multi-agent-v1-epochs5.yaml",
-        )
-    )
-    iteration = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml"
-            ),
-        )
-    )
-
-    differences = {
-        key
-        for key in control.keys() | iteration.keys()
-        if control.get(key) != iteration.get(key)
-    }
-    assert differences == {"config_path", "ent_coef", "output_dir"}
-    assert control["ent_coef"] == 0.01
-    assert iteration["ent_coef"] == 0.03
-
-
-def test_two_million_step_iteration_changes_only_budget_and_output_identity():
-    control = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml"
-            ),
-        )
-    )
-    iteration = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03-2m.yaml"
-            ),
-        )
-    )
-
-    differences = {
-        key
-        for key in control.keys() | iteration.keys()
-        if control.get(key) != iteration.get(key)
-    }
-    assert differences == {"config_path", "output_dir", "running_steps"}
-    assert control["running_steps"] == 1_000_000
-    assert iteration["running_steps"] == 2_000_000
-
-
-def test_reward_ordering_iteration_changes_only_coupled_reward_contract():
-    control = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/intersection-multi-agent-v1-epochs5-ent03.yaml"
-            ),
-        )
-    )
-    iteration = vars(
+def test_promoted_default_matches_the_retained_iteration_five_config():
+    baseline = vars(load_configs(DEFAULT_HIGHWAY_ENV_ID, agent="mappo"))
+    retained_iteration = vars(
         load_configs(
             DEFAULT_HIGHWAY_ENV_ID,
             config_path=(
@@ -169,63 +90,7 @@ def test_reward_ordering_iteration_changes_only_coupled_reward_contract():
 
     differences = {
         key
-        for key in control.keys() | iteration.keys()
-        if control.get(key) != iteration.get(key)
+        for key in baseline.keys() | retained_iteration.keys()
+        if baseline.get(key) != retained_iteration.get(key)
     }
-    assert differences == {"config_path", "highway_config", "output_dir"}
-
-    reward_fields = {
-        "collision_reward": (-10, -40),
-        "high_speed_reward": (0.5, 0.01),
-        "arrived_reward": (5, 10),
-    }
-    environment_differences = {
-        key
-        for key in control["highway_config"].keys()
-        | iteration["highway_config"].keys()
-        if control["highway_config"].get(key)
-        != iteration["highway_config"].get(key)
-    }
-    assert environment_differences == set(reward_fields)
-    for field, (before, after) in reward_fields.items():
-        assert control["highway_config"][field] == before
-        assert iteration["highway_config"][field] == after
-
-    assert iteration["highway_config"]["normalize_reward"] is False
-    assert iteration["highway_config"]["reward_speed_range"] == [5.0, 9.0]
-    assert iteration["running_steps"] == 1_000_000
-    assert iteration["gamma"] == 0.99
-    assert iteration["gae_lambda"] == 0.95
-
-
-def test_timescale_iteration_changes_only_coupled_discount_contract():
-    control = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/"
-                "intersection-multi-agent-v1-epochs5-ent03-reward-ordering.yaml"
-            ),
-        )
-    )
-    iteration = vars(
-        load_configs(
-            DEFAULT_HIGHWAY_ENV_ID,
-            config_path=(
-                "configs/mappo/"
-                "intersection-multi-agent-v1-epochs5-ent03-"
-                "reward-ordering-timescale.yaml"
-            ),
-        )
-    )
-
-    differences = {
-        key
-        for key in control.keys() | iteration.keys()
-        if control.get(key) != iteration.get(key)
-    }
-    assert differences == {"config_path", "gae_lambda", "gamma", "output_dir"}
-    assert control["gamma"] == 0.99
-    assert iteration["gamma"] == 0.998
-    assert control["gae_lambda"] == 0.95
-    assert iteration["gae_lambda"] == 0.99
+    assert differences == {"config_path", "output_dir"}
