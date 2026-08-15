@@ -61,7 +61,7 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 | IPPO、Attention-MAPPO、CommNet、IC3Net、CA-ComMAPPO 代码与主配置 | 已有，需逐项重新 smoke |
 | MAPPO seeds 2/3 | 未运行 |
 | 其他学习算法多 seed 正式训练 | 未运行 |
-| 顺序扰动 evaluator | 未实现 |
+| 顺序扰动 evaluator | 已实现，待最终 checkpoint 生成正式 artifact |
 | attention/TTC 导出和论文图 | 未实现 |
 | 跨车辆数 checkpoint 兼容协议 | 未设计完成 |
 | 最终统计检验与论文结果归档 | 未完成 |

@@ -130,6 +130,27 @@ manifest 和训练合同与 checkpoint 完全一致。
 
 ## 4. 结果审定与聚合
 
+### 观测顺序稳健性
+
+MAPPO、Attention-MAPPO 和辅助 CA-ComMAPPO 检查复用各自 seed 1 的严格 best
+checkpoint：
+
+```bash
+WANDB_MODE=offline uv run python main.py mappo \
+  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --mode order-eval --seed 1 \
+  --model-dir-load runs/<algorithm>_highway/<benchmark-run>/models/best_model.pth
+```
+
+正式模式固定环境 cases `20000..20099` 和 permutation seeds
+`30000,30001,30002`。每次动作前只在 actor 本地观测副本中打乱 ego 后的完整车辆行；
+ego、global state 和 agent mask 不变。run 输出 `order_robustness_metadata.json`、逐 case
+配对的 `order_robustness_pairs.jsonl` 和汇总差值
+`order_robustness_summary.json`。这些 case 内差值用于 H2 辅助证据，不替代跨训练 seed
+方差。
+
+### 正式聚合
+
 不要用宽泛 glob 直接生成论文表。先人工检查每个 final run，再建立显式 manifest：
 
 ```json

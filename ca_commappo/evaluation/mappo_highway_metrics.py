@@ -58,6 +58,8 @@ def evaluate_highway_policy(
     deterministic: bool = True,
     record_once_per_env: bool = False,
     episode_seeds: Sequence[int] | None = None,
+    observation_transform: Callable[[dict[str, Any], int, int], dict[str, Any]]
+    | None = None,
 ) -> dict[str, Any]:
     if test_episodes <= 0:
         raise ValueError("test_episodes must be a positive integer")
@@ -70,10 +72,13 @@ def evaluate_highway_policy(
             raise ValueError("episode_seeds requires record_once_per_env=True")
         if len(episode_seeds) != num_envs:
             raise ValueError("episode_seeds must contain one seed per environment")
+    if observation_transform is not None and episode_seeds is None:
+        raise ValueError("observation_transform requires explicit episode_seeds")
 
     records: list[dict[str, Any]] = []
     scores: list[float] = []
     completed_envs: set[int] = set()
+    action_steps = [0 for _ in range(num_envs)]
 
     use_actions_mask = getattr(agents, "use_actions_mask", False)
     use_global_state = getattr(agents, "use_global_state", False)
@@ -86,12 +91,22 @@ def evaluate_highway_policy(
     rnn_hidden_actor, rnn_hidden_critic = _init_rnn_hidden(agents, num_envs, use_rnn)
 
     while len(records) < test_episodes:
+        policy_obs_dict = obs_dict
+        if observation_transform is not None:
+            policy_obs_dict = [
+                observation_transform(
+                    deepcopy(env_observations),
+                    int(episode_seeds[i_env]),
+                    action_steps[i_env],
+                )
+                for i_env, env_observations in enumerate(obs_dict)
+            ]
         sampling_context = (
             deterministic_policy_sampling() if deterministic else _null_context()
         )
         with sampling_context:
             policy_out = agents.action(
-                obs_dict=obs_dict,
+                obs_dict=policy_obs_dict,
                 state=state,
                 avail_actions_dict=avail_actions,
                 rnn_hidden_actor=rnn_hidden_actor,
@@ -104,6 +119,7 @@ def evaluate_highway_policy(
         next_obs_dict, _rewards_dict, terminated_dict, truncated, infos = envs.step(
             policy_out["actions"]
         )
+        action_steps = [step + 1 for step in action_steps]
         next_state = envs.buf_state if use_global_state else None
         next_avail_actions = envs.buf_avail_actions if use_actions_mask else None
         current_infos = [_info_for_next_action(info) for info in infos]

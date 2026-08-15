@@ -163,6 +163,30 @@ def test_record_once_per_env_ignores_fast_env_repeats_and_records_seeds():
     assert len(result["episodes"]) == 2
 
 
+def test_observation_transform_only_changes_policy_input_copy():
+    agent = TransformAgent()
+    envs = TransformVecEnv()
+    calls = []
+
+    def transform(observations, episode_seed, action_step):
+        calls.append((episode_seed, action_step))
+        observations["agent_0"] = 99
+        return observations
+
+    evaluate_highway_policy(
+        agents=agent,
+        envs=envs,
+        test_episodes=1,
+        log_prefix=None,
+        record_once_per_env=True,
+        episode_seeds=[20_000],
+        observation_transform=transform,
+    )
+
+    assert calls == [(20_000, 0)]
+    assert agent.observed_policy_input["agent_0"] == 99
+
+
 def test_deterministic_sampling_uses_argmax_without_advancing_torch_rng():
     distribution = CategoricalDistribution(3)
     distribution.set_param(logits=torch.tensor([[0.0, 3.0, 1.0]]))
@@ -235,6 +259,22 @@ class FakeVecEnv:
             [False],
             [info],
         )
+
+
+class TransformAgent(FakeAgent):
+    def action(self, *, obs_dict, **_kwargs):
+        self.observed_policy_input = obs_dict[0]
+        return {
+            "actions": [{"agent_0": 1, "agent_1": 1}],
+            "rnn_hidden_actor": None,
+            "rnn_hidden_critic": None,
+        }
+
+
+class TransformVecEnv(FakeVecEnv):
+    def step(self, actions):
+        assert self.buf_obs[0]["agent_0"] == 0
+        return super().step(actions)
 
 
 class TwoEnvAgent:

@@ -1,4 +1,5 @@
 import argparse
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -40,9 +41,16 @@ from ca_commappo.evaluation.mappo_video_recorder import (
 )
 from ca_commappo.evaluation.model_provenance import (
     BEST_MODEL_FILENAME,
+    VERIFIED_PROVENANCE,
     load_model_provenance,
     require_clean_source_checkout,
     write_best_model_provenance,
+)
+from ca_commappo.evaluation.order_robustness import (
+    DEFAULT_PERMUTATION_SEEDS,
+    make_neighbour_row_permuter,
+    observation_permutation_protocol,
+    write_order_robustness_artifacts,
 )
 from ca_commappo.training.mappo_run_layout import (
     align_wandb_run_name,
@@ -90,9 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("train", "test", "benchmark"),
+        choices=("train", "test", "benchmark", "order-eval"),
         default="train",
-        help="train runs one training job, test loads a model, benchmark alternates train/test.",
+        help=(
+            "train runs one training job; test loads a model; benchmark alternates "
+            "train/test; order-eval performs paired observation-order perturbations."
+        ),
     )
     parser.add_argument("--parallels", type=int, default=None)
     parser.add_argument("--buffer-size", type=int, default=None)
@@ -120,6 +131,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Root directory for isolated run folders, logs, models, eval JSON, and videos.",
     )
     parser.add_argument("--model-dir-load", type=str, default=None)
+    parser.add_argument(
+        "--order-permutation-seeds",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Diagnostic override for the fixed order-eval seeds 30000 30001 30002.",
+    )
     parser.add_argument(
         "--allow-unverified-model",
         action="store_true",
@@ -209,8 +227,9 @@ def cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
         "logger": args.logger,
         "output_dir": args.output_dir,
         "model_dir_load": args.model_dir_load,
+        "order_permutation_seeds": args.order_permutation_seeds,
         "allow_unverified_model": args.allow_unverified_model,
-        "test_mode": args.mode == "test",
+        "test_mode": args.mode in {"test", "order-eval"},
         "record_video": args.record_video,
         "video_episodes": args.video_episodes,
         "video_dir": args.video_dir,
@@ -323,6 +342,8 @@ def evaluate_fixed_seed_policy(
     protocol: dict[str, Any],
     phase: str,
     log_prefix: str,
+    observation_transform: Callable[[dict[str, Any], int, int], dict[str, Any]]
+    | None = None,
 ) -> dict[str, Any]:
     """Evaluate exactly one episode for every explicit seed in ``protocol``."""
 
@@ -346,6 +367,7 @@ def evaluate_fixed_seed_policy(
                 deterministic=True,
                 record_once_per_env=True,
                 episode_seeds=batch_seeds,
+                observation_transform=observation_transform,
             )
         finally:
             eval_envs.close()
@@ -463,6 +485,86 @@ def test(configs: argparse.Namespace, agents, envs) -> None:
         if video_result.get("contact_sheet_path"):
             print(f"Contact sheet saved: {video_result['contact_sheet_path']}")
     print("Finish testing.")
+
+
+def order_robustness_test(configs: argparse.Namespace, agents) -> None:
+    model_path = getattr(configs, "model_dir_load", None) or configs.model_dir
+    model_provenance = load_model_provenance(
+        model_path=model_path,
+        expected_training_seed=configs.seed,
+        expected_configs=configs,
+        allow_unverified=bool(getattr(configs, "allow_unverified_model", False)),
+    )
+    if model_provenance.get("verification") != VERIFIED_PROVENANCE:
+        raise ValueError("order-eval requires a strictly verified provenance v2 model")
+    agents.load_model(path=model_path)
+
+    permutation_seeds = tuple(
+        int(seed)
+        for seed in getattr(
+            configs, "order_permutation_seeds", DEFAULT_PERMUTATION_SEEDS
+        )
+    )
+    if not bool(getattr(configs, "smoke", False)):
+        if int(configs.final_eval_seed) != 20_000 or int(configs.test_episode) != 100:
+            raise ValueError("formal order-eval requires final cases 20000..20099")
+        if permutation_seeds != DEFAULT_PERMUTATION_SEEDS:
+            raise ValueError(
+                "formal order-eval requires permutation seeds 30000 30001 30002"
+            )
+
+    observation_config = configs.highway_config["observation"]["observation_config"]
+    vehicles_count = int(observation_config["vehicles_count"])
+    feature_names = [str(name) for name in observation_config["features"]]
+    permutation_protocol = observation_permutation_protocol(
+        permutation_seeds=permutation_seeds,
+        vehicles_count=vehicles_count,
+        feature_names=feature_names,
+    )
+    evaluation_protocol = fixed_seed_evaluation_protocol(
+        base_seed=configs.final_eval_seed,
+        episode_count=configs.test_episode,
+        parallels=configs.eval_parallels,
+        purpose="observation_order_robustness",
+    )
+    baseline_result = evaluate_fixed_seed_policy(
+        configs=configs,
+        agents=agents,
+        protocol=evaluation_protocol,
+        phase="order_baseline",
+        log_prefix="Order-Robustness/Baseline",
+    )
+    perturbed_results = {}
+    for permutation_seed in permutation_seeds:
+        perturbed_results[permutation_seed] = evaluate_fixed_seed_policy(
+            configs=configs,
+            agents=agents,
+            protocol=evaluation_protocol,
+            phase="order_permuted",
+            log_prefix=f"Order-Robustness/Permutation-{permutation_seed}",
+            observation_transform=make_neighbour_row_permuter(
+                permutation_seed=permutation_seed,
+                vehicles_count=vehicles_count,
+                feature_count=len(feature_names),
+            ),
+        )
+    paths = write_order_robustness_artifacts(
+        output_dir=agents.log_dir,
+        config=configs,
+        evaluation_protocol=evaluation_protocol,
+        permutation_protocol=permutation_protocol,
+        model_provenance=model_provenance,
+        baseline_result=baseline_result,
+        perturbed_results=perturbed_results,
+    )
+    print("Order-robustness baseline:")
+    print_highway_summary(baseline_result["summary"])
+    for permutation_seed, result in perturbed_results.items():
+        print(f"Order permutation seed {permutation_seed}:")
+        print_highway_summary(result["summary"])
+    print(f"Order-robustness metadata saved: {paths['metadata']}")
+    print(f"Order-robustness pairs saved: {paths['pairs']}")
+    print(f"Order-robustness summary saved: {paths['summary']}")
 
 
 def benchmark(
@@ -590,7 +692,9 @@ def _save_best_model_with_provenance(
 
 
 def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None:
-    if mode in {"benchmark", "test"} and not bool(getattr(configs, "smoke", False)):
+    if mode in {"benchmark", "test", "order-eval"} and not bool(
+        getattr(configs, "smoke", False)
+    ):
         require_clean_source_checkout()
     prepare_run_directory(configs, mode)
     patch_xuance_marl_buffer_aliases()
@@ -612,6 +716,8 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
             benchmark(configs, agents, save_model=save_model)
         elif mode == "test":
             test(configs, agents, envs)
+        elif mode == "order-eval":
+            order_robustness_test(configs, agents)
         else:
             train(configs, agents, save_model=save_model)
     finally:

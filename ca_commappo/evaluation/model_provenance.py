@@ -37,6 +37,7 @@ _NON_TRAINING_CONFIG_KEYS = {
     "logger",
     "model_dir",
     "model_dir_load",
+    "order_permutation_seeds",
     "output_dir",
     "record_video",
     "run_dir",

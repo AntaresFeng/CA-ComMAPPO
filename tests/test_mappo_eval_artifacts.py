@@ -527,6 +527,69 @@ def test_formal_benchmark_checks_clean_source_before_creating_run(monkeypatch):
     assert prepared is False
 
 
+def test_order_eval_runs_baseline_and_each_permutation_seed(tmp_path, monkeypatch):
+    configs = Namespace(
+        seed=1,
+        smoke=True,
+        model_dir_load="models/best_model.pth",
+        final_eval_seed=20_000,
+        test_episode=1,
+        eval_parallels=1,
+        order_permutation_seeds=[30_000, 30_001],
+        highway_config={
+            "observation": {
+                "observation_config": {
+                    "vehicles_count": 3,
+                    "features": ["presence", "x"],
+                }
+            }
+        },
+    )
+    agent = FakeAgent(tmp_path / "order_run")
+    calls = []
+    artifact_call = {}
+
+    monkeypatch.setattr(
+        mappo_training,
+        "load_model_provenance",
+        lambda **_kwargs: {"verification": "sidecar_sha256_verified"},
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "evaluate_fixed_seed_policy",
+        lambda **kwargs: (
+            calls.append(kwargs)
+            or {
+                "episodes": [{"seed": 20_000}],
+                "summary": {"episodes": 1},
+                "scores": [0.0],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "write_order_robustness_artifacts",
+        lambda **kwargs: (
+            artifact_call.update(kwargs)
+            or {
+                "metadata": tmp_path / "metadata.json",
+                "pairs": tmp_path / "pairs.jsonl",
+                "summary": tmp_path / "summary.json",
+            }
+        ),
+    )
+    monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
+
+    mappo_training.order_robustness_test(configs, agent)
+
+    assert agent.loaded_model_path == "models/best_model.pth"
+    assert len(calls) == 3
+    assert calls[0].get("observation_transform") is None
+    assert callable(calls[1]["observation_transform"])
+    assert callable(calls[2]["observation_transform"])
+    assert sorted(artifact_call["perturbed_results"]) == [30_000, 30_001]
+
+
 def test_benchmark_train_segments_preserve_exact_budget_and_short_tail():
     configs = Namespace(running_steps=48, parallels=4, eval_interval=20)
 
