@@ -225,10 +225,16 @@ def deterministic_policy_sampling() -> Iterator[None]:
     """Make XuanCe's ``test_mode`` categorical/Gaussian action path deterministic.
 
     XuanCe 1.4.3 calls ``stochastic_sample`` even when ``test_mode=True``.  The
-    temporary, process-local patch keeps training rollouts untouched and also
-    prevents benchmark evaluation from advancing the training Torch RNG state.
+    categorical helper also takes argmax over dimension 1, which is the action
+    dimension only for feed-forward logits; recurrent policies emit
+    ``(batch, sequence, actions)``. IC3Net additionally samples its communication
+    gate with Torch's categorical distribution directly. The scoped replacements
+    use the final logits dimension for both paths, keep training untouched, and
+    prevent evaluation from advancing the training Torch RNG state.
     """
 
+    import torch
+    from torch.distributions import Categorical as TorchCategorical
     from xuance.torch.utils.distributions import (
         CategoricalDistribution,
         DiagGaussianDistribution,
@@ -239,15 +245,30 @@ def deterministic_policy_sampling() -> Iterator[None]:
         distribution_class: distribution_class.stochastic_sample
         for distribution_class in distribution_classes
     }
+    torch_categorical_sample = TorchCategorical.sample
+
+    def categorical_argmax(distribution):
+        return torch.argmax(distribution.distribution.probs, dim=-1)
+
+    def torch_categorical_argmax(distribution, sample_shape=None):
+        if sample_shape is None:
+            sample_shape = torch.Size()
+        actions = torch.argmax(distribution.probs, dim=-1)
+        if sample_shape:
+            actions = actions.expand(sample_shape + actions.shape)
+        return actions
+
     try:
-        for distribution_class in distribution_classes:
-            distribution_class.stochastic_sample = (
-                distribution_class.deterministic_sample
-            )
+        CategoricalDistribution.stochastic_sample = categorical_argmax
+        DiagGaussianDistribution.stochastic_sample = (
+            DiagGaussianDistribution.deterministic_sample
+        )
+        TorchCategorical.sample = torch_categorical_argmax
         yield
     finally:
         for distribution_class, original in originals.items():
             distribution_class.stochastic_sample = original
+        TorchCategorical.sample = torch_categorical_sample
 
 
 @contextmanager

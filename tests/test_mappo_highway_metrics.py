@@ -201,6 +201,31 @@ def test_deterministic_sampling_uses_argmax_without_advancing_torch_rng():
     assert torch.equal(torch.get_rng_state(), rng_before)
 
 
+def test_deterministic_sampling_handles_recurrent_logits_and_ic3net_gates():
+    distribution = CategoricalDistribution(3)
+    logits = torch.tensor(
+        [
+            [[0.0, 3.0, 1.0]],
+            [[4.0, 0.0, 1.0]],
+        ]
+    )
+    distribution.set_param(logits=logits)
+    gate = torch.distributions.Categorical(
+        logits=torch.tensor([[[0.0, 2.0]], [[3.0, 1.0]]])
+    )
+    rng_before = torch.get_rng_state().clone()
+
+    with deterministic_policy_sampling():
+        actions = distribution.stochastic_sample()
+        gates = gate.sample()
+
+    assert actions.shape == (2, 1)
+    assert actions.tolist() == [[1], [0]]
+    assert gates.shape == (2, 1)
+    assert gates.tolist() == [[1], [0]]
+    assert torch.equal(torch.get_rng_state(), rng_before)
+
+
 class FakeAgent:
     agent_keys: ClassVar[list[str]] = ["agent_0", "agent_1"]
     use_actions_mask = False
