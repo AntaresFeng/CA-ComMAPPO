@@ -15,6 +15,8 @@
   与 final evaluation 分别保留 `10000..10049` 和 `20000..20099`。
 - 正式训练启动后冻结代码、配置、`pyproject.toml` 和 `uv.lock`，直至对应 final test
   完成。每完成一个实现或实验阶段创建一次 Git 提交。
+- 非 smoke 的 benchmark/test 在创建 run 前检查 Git tracked tree；存在 staged 或
+  unstaged 修改时直接拒绝运行。被忽略的 `runs/` 产物不影响该门禁。
 - `runs/` 保存原始大体积 artifact 并被 Git 忽略；`results/` 只保存人工审定的
   manifest、聚合 CSV 和小型 provenance 摘要，受 Git 跟踪。
 
@@ -117,8 +119,13 @@ test 默认使用 deterministic argmax 和 seeds `20000..20099`。视频复用�
 seeds，输出逐 episode MP4、合并视频、contact sheet 与 `video_eval_summary.json`；
 视频 summary 不能替代 100-episode 数值结果。
 
-模型加载默认严格校验 sidecar 中的 checkpoint SHA、训练 seed/env seed、训练配置、
-runtime source 和设备。`--allow-unverified-model` 仅供诊断旧模型；相应结果会被正式
+provenance v2 sidecar 记录 checkpoint SHA、训练 seed/env seed、训练配置、设备、Git
+commit、tracked-tree clean 状态，以及 `main.py`、`pyproject.toml`、`uv.lock` 和
+`ca_commappo/**/*.py` 的逐文件 SHA manifest。严格模型加载要求当前 commit、runtime
+manifest 和训练合同与 checkpoint 完全一致。
+
+缺少 sidecar 或只有 provenance v1 的旧模型只能显式使用
+`--allow-unverified-model` 做诊断；其 test artifact 会标记为 unverified，并被正式
 聚合器拒绝。
 
 ## 4. 结果审定与聚合
@@ -150,8 +157,10 @@ uv run python -m ca_commappo.evaluation.aggregate_results \
 ```
 
 聚合器只接受不少于 100 episodes 的 final test，重算 episode summary，并校验协议、
-seed 集、模型 provenance、训练合同和重复 checkpoint。学习策略报告 sample std；静态
-baseline 是固定策略点估计，std 留空。
+seed 集、保留的 checkpoint/sidecar、训练合同和重复 checkpoint。它使用 artifact 内的
+v2 manifest 完成历史聚合，不要求聚合命令运行在训练时 checkout；但同一 manifest 中
+所有学习算法仍必须来自同一 Git commit 和 runtime manifest。学习策略报告 sample
+std；静态 baseline 是固定策略点估计，std 留空。
 
 ## 5. 阶段收尾
 

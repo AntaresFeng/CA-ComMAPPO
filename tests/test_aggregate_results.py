@@ -22,12 +22,20 @@ from ca_commappo.evaluation.aggregate_results import (
 )
 from ca_commappo.evaluation.highway_metrics import summarize_episode_records
 from ca_commappo.evaluation.model_provenance import (
+    PROVENANCE_SCHEMA_VERSION,
     VERIFIED_PROVENANCE,
     canonical_json_sha256,
     canonical_training_config,
-    runtime_source_sha256,
+    provenance_path_for_model,
     sha256_file,
 )
+
+SOURCE_COMMIT = "a" * 40
+SOURCE_MANIFEST = {
+    "main.py": "b" * 64,
+    "pyproject.toml": "c" * 64,
+    "uv.lock": "d" * 64,
+}
 
 
 def _summary(
@@ -93,6 +101,10 @@ def _write_run(
     env_id: str = "intersection-multi-agent-v1",
     highway_config: dict | None = None,
     evaluation_parallels: int = 10,
+    config_overrides: dict | None = None,
+    training_device: str = "cpu",
+    source_commit: str = SOURCE_COMMIT,
+    source_manifest: dict[str, str] | None = None,
 ) -> Path:
     # Match the actual run-root layout: no extra seed_<n> child directory.
     run_dir = tmp_path / "runs" / f"{algo}_highway" / run_name
@@ -118,14 +130,16 @@ def _write_run(
         "env_seed": derive_training_env_seed(seed),
         "highway_config": highway_config or {"controlled_vehicles": 4},
     }
+    config.update(config_overrides or {})
     model_provenance = None
     if algo not in {"random", "idle_only"}:
         model_path = run_dir / "models" / "best_model.pth"
         model_path.parent.mkdir(parents=True)
         model_path.write_bytes(f"{algo}:{seed}:{run_name}".encode())
         training_config = canonical_training_config(Namespace(**config))
-        model_provenance = {
-            "schema_version": 1,
+        runtime_manifest = dict(source_manifest or SOURCE_MANIFEST)
+        sidecar_payload = {
+            "schema_version": PROVENANCE_SCHEMA_VERSION,
             "verification": VERIFIED_PROVENANCE,
             "checkpoint_name": "best_model.pth",
             "checkpoint_path": str(model_path.resolve()),
@@ -137,8 +151,11 @@ def _write_run(
             "source_config_path": "configs/mappo/test.yaml",
             "training_config": training_config,
             "training_config_sha256": canonical_json_sha256(training_config),
-            "runtime_source_sha256": runtime_source_sha256(),
-            "training_device": "cpu",
+            "source_commit": source_commit,
+            "source_tracked_tree_clean": True,
+            "runtime_source_manifest": runtime_manifest,
+            "runtime_source_sha256": canonical_json_sha256(runtime_manifest),
+            "training_device": training_device,
             "selected_epoch": 1,
             "selected_step": 10_000,
             "selection_summary": {"episodes": 50, "arrival_rate": 0.5},
@@ -146,6 +163,12 @@ def _write_run(
                 "purpose": "checkpoint_selection",
                 "type": "fixed_explicit_episode_seeds",
             },
+        }
+        sidecar_path = provenance_path_for_model(model_path).resolve()
+        sidecar_path.write_text(json.dumps(sidecar_payload), encoding="utf-8")
+        model_provenance = {
+            **sidecar_payload,
+            "provenance_sidecar": str(sidecar_path),
         }
     complete_records = []
     for source_record in records:
@@ -526,18 +549,14 @@ def test_rejects_unverified_legacy_model_from_final_aggregation(tmp_path):
 
 def test_rejects_different_training_contracts_across_learned_seeds(tmp_path):
     first = _write_run(tmp_path, "mappo", "seed-1", 1, [_record(0.1, 0.9, 1.0)])
-    second = _write_run(tmp_path, "mappo", "seed-2", 2, [_record(0.2, 0.8, 2.0)])
-    metadata_path = second.parent / "eval_metadata.json"
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    metadata["config"]["running_steps"] = 2_000_000
-    changed_contract = canonical_training_config(Namespace(**metadata["config"]))
-    changed_hash = canonical_json_sha256(changed_contract)
-    metadata["model_provenance"]["training_config"] = changed_contract
-    metadata["model_provenance"]["training_config_sha256"] = changed_hash
-    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
-    record = json.loads(second.read_text(encoding="utf-8"))
-    record["model_provenance"] = metadata["model_provenance"]
-    second.write_text(json.dumps(record), encoding="utf-8")
+    second = _write_run(
+        tmp_path,
+        "mappo",
+        "seed-2",
+        2,
+        [_record(0.2, 0.8, 2.0)],
+        config_overrides={"running_steps": 2_000_000},
+    )
 
     with pytest.raises(AggregationError, match="do not share.*training config"):
         aggregate([first, second])
@@ -545,17 +564,46 @@ def test_rejects_different_training_contracts_across_learned_seeds(tmp_path):
 
 def test_rejects_different_training_devices_across_learned_seeds(tmp_path):
     first = _write_run(tmp_path, "mappo", "seed-1", 1, [_record(0.1, 0.9, 1.0)])
-    second = _write_run(tmp_path, "mappo", "seed-2", 2, [_record(0.2, 0.8, 2.0)])
-    metadata_path = second.parent / "eval_metadata.json"
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    metadata["model_provenance"]["training_device"] = "cuda:0"
-    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
-    record = json.loads(second.read_text(encoding="utf-8"))
-    record["model_provenance"] = metadata["model_provenance"]
-    second.write_text(json.dumps(record), encoding="utf-8")
+    second = _write_run(
+        tmp_path,
+        "mappo",
+        "seed-2",
+        2,
+        [_record(0.2, 0.8, 2.0)],
+        training_device="cuda:0",
+    )
 
-    with pytest.raises(AggregationError, match="runtime sources, and device"):
+    with pytest.raises(AggregationError, match="training config and device"):
         aggregate([first, second])
+
+
+def test_rejects_learned_algorithms_from_different_source_commits(tmp_path):
+    mappo = _write_run(tmp_path, "mappo", "seed-1", 1, [_record(0.1, 0.9, 1.0)])
+    ippo = _write_run(
+        tmp_path,
+        "ippo",
+        "seed-1",
+        1,
+        [_record(0.2, 0.8, 2.0)],
+        source_commit="e" * 40,
+    )
+
+    with pytest.raises(AggregationError, match="same source commit"):
+        aggregate([mappo, ippo])
+
+
+def test_rejects_embedded_provenance_that_differs_from_sidecar(tmp_path):
+    path = _write_run(tmp_path, "mappo", "seed-1", 1, [_record(0.1, 0.9, 1.0)])
+    metadata_path = path.parent / "eval_metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["model_provenance"]["selected_step"] = 20_000
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["model_provenance"] = metadata["model_provenance"]
+    path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(AggregationError, match="does not match its retained sidecar"):
+        aggregate([path])
 
 
 def test_multiple_records_are_not_best_selected(tmp_path):

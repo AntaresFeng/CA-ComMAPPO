@@ -505,6 +505,28 @@ def test_load_configs_stores_config_path(tmp_path):
     assert configs.config_path == str(config_path)
 
 
+def test_formal_benchmark_checks_clean_source_before_creating_run(monkeypatch):
+    configs = Namespace(smoke=False)
+    prepared = False
+
+    def reject_dirty_source():
+        raise RuntimeError("dirty source")
+
+    def mark_prepared(*_args):
+        nonlocal prepared
+        prepared = True
+
+    monkeypatch.setattr(
+        mappo_training, "require_clean_source_checkout", reject_dirty_source
+    )
+    monkeypatch.setattr(mappo_training, "prepare_run_directory", mark_prepared)
+
+    with pytest.raises(RuntimeError, match="dirty source"):
+        mappo_training.run(configs, mode="benchmark")
+
+    assert prepared is False
+
+
 def test_benchmark_train_segments_preserve_exact_budget_and_short_tail():
     configs = Namespace(running_steps=48, parallels=4, eval_interval=20)
 

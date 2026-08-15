@@ -41,6 +41,7 @@ from ca_commappo.evaluation.mappo_video_recorder import (
 from ca_commappo.evaluation.model_provenance import (
     BEST_MODEL_FILENAME,
     load_model_provenance,
+    require_clean_source_checkout,
     write_best_model_provenance,
 )
 from ca_commappo.training.mappo_run_layout import (
@@ -589,6 +590,8 @@ def _save_best_model_with_provenance(
 
 
 def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None:
+    if mode in {"benchmark", "test"} and not bool(getattr(configs, "smoke", False)):
+        require_clean_source_checkout()
     prepare_run_directory(configs, mode)
     patch_xuance_marl_buffer_aliases()
     patch_xuance_mappo_masked_statistics()

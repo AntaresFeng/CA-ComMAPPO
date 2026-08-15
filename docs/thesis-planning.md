@@ -55,7 +55,7 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 
 | 项目 | 状态 |
 | --- | --- |
-| 环境适配、统一指标、固定评估 seed、provenance | 已完成 |
+| 环境适配、统一指标、固定评估 seed、provenance v2 | 已完成 |
 | MAPPO canonical 配置与 seed 1 benchmark/final/video | 已完成 |
 | random / idle-only 同 case 正式结果 | 已完成 |
 | IPPO、Attention-MAPPO、CommNet、IC3Net、CA-ComMAPPO 代码与主配置 | 已有，需逐项重新 smoke |
@@ -66,19 +66,18 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 | 跨车辆数 checkpoint 兼容协议 | 未设计完成 |
 | 最终统计检验与论文结果归档 | 未完成 |
 
-当前只能把 MAPPO seed 1 作为参考结果，不能形成跨算法论文结论。
+当前只能把历史 MAPPO/CA-ComMAPPO seed 1 作为预实验参考；provenance v1 结果不进入
+新的正式聚合，不能形成跨算法论文结论。
 
 ## 实施顺序
 
-1. 修复 [`ca_commappo_design.md`](ca_commappo_design.md) 中阻断正式训练的设计债务，
-   增加端到端 smoke 回归。
-2. 在同一提交上 smoke 全算法，冻结算法矩阵和最小训练 seed 集 `[1,2,3]`。
-3. 补齐 MAPPO seeds 2/3，确认基线方差和资源预算。
-4. 依次运行 Attention-MAPPO、CA-ComMAPPO/no-prior，再运行 IPPO、CommNet、IC3Net。
-5. 实现顺序扰动与 attention 导出；协议先于结果冻结。
-6. 只有解决 agent identity、critic 输入和 checkpoint shape 后，才启动 4→6/8/10
-   车辆泛化实验。
-7. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
+1. 实现顺序扰动、attention/TTC 导出和统计绘图工具，并先冻结评估协议。
+2. 在同一提交上 smoke 全算法，冻结算法矩阵和训练 seed 集 `[1,2,3]`。
+3. 在最终冻结提交上依次重跑 MAPPO、Attention-MAPPO、CA-ComMAPPO/no-prior，随后
+   运行 IPPO、CommNet、IC3Net。
+4. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
+
+本论文固定四车任务，不开展 4→6/8/10 checkpoint 泛化实验，也不声明规模泛化能力。
 
 ## 论文边界
 

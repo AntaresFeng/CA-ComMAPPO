@@ -25,7 +25,6 @@ import csv
 import glob
 import json
 import math
-import re
 import statistics
 import sys
 from argparse import Namespace
@@ -40,15 +39,12 @@ from ca_commappo.evaluation.model_provenance import (
     BEST_MODEL_FILENAME,
     PROVENANCE_SCHEMA_VERSION,
     VERIFIED_PROVENANCE,
-    canonical_json_sha256,
-    canonical_training_config,
-    runtime_source_sha256,
-    sha256_file,
+    provenance_path_for_model,
+    validate_model_provenance_payload,
 )
 
 MIN_FINAL_TEST_EPISODES = 100
 _STATIC_BASELINE_ALGORITHMS = {"random", "idle_only"}
-_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 METRICS = [
     "arrival_rate",
@@ -78,6 +74,7 @@ class _FinalResult:
     protocol: tuple[tuple[str, str], ...]
     checkpoint_sha256: str | None
     training_config_sha256: str | None
+    source_commit: str | None
     runtime_source_sha256: str | None
     training_device: str | None
 
@@ -318,7 +315,7 @@ def _require_model_provenance(
     algorithm: str,
     training_seed: int,
     path: Path,
-) -> tuple[str | None, str | None, str | None, str | None]:
+) -> tuple[str | None, str | None, str | None, str | None, str | None]:
     metadata_provenance = metadata.get("model_provenance")
     record_provenance = record.get("model_provenance")
     evaluation_protocol = metadata.get("evaluation_protocol")
@@ -339,7 +336,7 @@ def _require_model_provenance(
             raise AggregationError(
                 f"static baseline {algorithm!r} must not claim model provenance in {path}"
             )
-        return None, None, None, None
+        return None, None, None, None, None
 
     if not isinstance(metadata_provenance, dict) or not isinstance(
         record_provenance, dict
@@ -370,84 +367,64 @@ def _require_model_provenance(
 
     checkpoint_hash = provenance.get("checkpoint_sha256")
     training_config_hash = provenance.get("training_config_sha256")
+    source_commit = provenance.get("source_commit")
     source_hash = provenance.get("runtime_source_sha256")
     training_device = provenance.get("training_device")
-    for field, value in (
-        ("checkpoint_sha256", checkpoint_hash),
-        ("training_config_sha256", training_config_hash),
-        ("runtime_source_sha256", source_hash),
-    ):
-        if not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value):
-            raise AggregationError(
-                f"model_provenance.{field} must be a SHA-256 in {path}"
-            )
-
     checkpoint_path = Path(str(provenance.get("checkpoint_path", "")))
     if checkpoint_path.name != BEST_MODEL_FILENAME or not checkpoint_path.is_file():
         raise AggregationError(
             f"retained best-model checkpoint is missing for {path}: {checkpoint_path}"
         )
-    observed_checkpoint_hash = sha256_file(checkpoint_path)
-    if observed_checkpoint_hash != checkpoint_hash:
+    sidecar_value = provenance.get("provenance_sidecar")
+    if not isinstance(sidecar_value, str) or not sidecar_value:
         raise AggregationError(
-            f"retained checkpoint SHA-256 mismatch for {path}: "
-            f"expected {checkpoint_hash}, observed {observed_checkpoint_hash}"
+            f"model_provenance.provenance_sidecar must be retained in {path}"
+        )
+    sidecar_path = Path(sidecar_value).expanduser().resolve()
+    expected_sidecar_path = provenance_path_for_model(checkpoint_path).resolve()
+    if sidecar_path != expected_sidecar_path or not sidecar_path.is_file():
+        raise AggregationError(
+            f"retained provenance sidecar is missing or misplaced for {path}: "
+            f"{sidecar_path}"
+        )
+    try:
+        sidecar_payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise AggregationError(
+            f"invalid retained provenance sidecar for {path}: {error}"
+        ) from error
+    if not isinstance(sidecar_payload, dict):
+        raise AggregationError(f"retained provenance sidecar must be an object: {path}")
+    embedded_payload = dict(provenance)
+    embedded_payload.pop("provenance_sidecar", None)
+    if embedded_payload != sidecar_payload:
+        raise AggregationError(
+            f"embedded model_provenance does not match its retained sidecar in {path}"
         )
 
-    training_config = provenance.get("training_config")
-    if not isinstance(training_config, dict):
-        raise AggregationError(
-            f"model_provenance.training_config must be an object in {path}"
-        )
-    if canonical_json_sha256(training_config) != training_config_hash:
-        raise AggregationError(
-            f"model_provenance training-config fingerprint is invalid in {path}"
-        )
     final_config = metadata.get("config")
     if not isinstance(final_config, dict):
         raise AggregationError(f"metadata.config must be an object in {path}")
-    final_contract_hash = canonical_json_sha256(
-        canonical_training_config(Namespace(**final_config))
+    try:
+        validate_model_provenance_payload(
+            sidecar_payload,
+            checkpoint_path=checkpoint_path,
+            expected_training_seed=training_seed,
+            expected_configs=Namespace(**final_config),
+            verify_current_source=False,
+            require_clean_source=True,
+        )
+    except (OSError, TypeError, ValueError) as error:
+        raise AggregationError(
+            f"invalid retained model provenance in {path}: {error}"
+        ) from error
+    return (
+        str(checkpoint_hash),
+        str(training_config_hash),
+        str(source_commit),
+        str(source_hash),
+        str(training_device),
     )
-    if final_contract_hash != training_config_hash:
-        raise AggregationError(
-            f"final-test config does not match the checkpoint training contract in {path}"
-        )
-
-    if runtime_source_sha256() != source_hash:
-        raise AggregationError(
-            f"current runtime sources differ from checkpoint provenance in {path}"
-        )
-    if not isinstance(training_device, str) or not training_device:
-        raise AggregationError(
-            f"model_provenance.training_device must be non-empty in {path}"
-        )
-    for field in ("selected_epoch", "selected_step"):
-        value = provenance.get(field)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise AggregationError(
-                f"model_provenance.{field} must be non-negative in {path}"
-            )
-    if (
-        not isinstance(provenance.get("source_run_id"), str)
-        or not provenance["source_run_id"]
-    ):
-        raise AggregationError(
-            f"model_provenance.source_run_id must be non-empty in {path}"
-        )
-    if not isinstance(provenance.get("selection_summary"), dict):
-        raise AggregationError(
-            f"model_provenance.selection_summary must be an object in {path}"
-        )
-    selection_protocol = provenance.get("selection_protocol")
-    if (
-        not isinstance(selection_protocol, dict)
-        or selection_protocol.get("purpose") != "checkpoint_selection"
-    ):
-        raise AggregationError(
-            f"model_provenance lacks checkpoint-selection protocol in {path}"
-        )
-    return checkpoint_hash, training_config_hash, source_hash, training_device
 
 
 def _validate_episode_payload(
@@ -672,6 +649,7 @@ def _load_final_result(path: str | Path) -> _FinalResult:
     (
         checkpoint_hash,
         training_config_hash,
+        source_commit,
         source_hash,
         training_device,
     ) = _require_model_provenance(
@@ -690,6 +668,7 @@ def _load_final_result(path: str | Path) -> _FinalResult:
         protocol=protocol_fingerprint,
         checkpoint_sha256=checkpoint_hash,
         training_config_sha256=training_config_hash,
+        source_commit=source_commit,
         runtime_source_sha256=source_hash,
         training_device=training_device,
     )
@@ -746,7 +725,8 @@ def aggregate(
         }
     by_key: dict[tuple[str, int], _FinalResult] = {}
     reference: _FinalResult | None = None
-    learned_contracts: dict[str, tuple[str, str, str]] = {}
+    learned_contracts: dict[str, tuple[str, str]] = {}
+    learned_source: tuple[str, str] | None = None
     learned_checkpoint_owners: dict[tuple[str, str], _FinalResult] = {}
 
     for path in jsonl_paths:
@@ -771,16 +751,26 @@ def aggregate(
         if result.checkpoint_sha256 is not None:
             contract = (
                 str(result.training_config_sha256),
-                str(result.runtime_source_sha256),
                 str(result.training_device),
             )
             previous_contract = learned_contracts.get(result.algorithm)
             if previous_contract is not None and contract != previous_contract:
                 raise AggregationError(
                     f"learned seeds for algorithm={result.algorithm!r} do not share "
-                    "the same training config, runtime sources, and device"
+                    "the same training config and device"
                 )
             learned_contracts[result.algorithm] = contract
+
+            source = (
+                str(result.source_commit),
+                str(result.runtime_source_sha256),
+            )
+            if learned_source is not None and source != learned_source:
+                raise AggregationError(
+                    "learned-policy artifacts do not share the same source commit "
+                    "and runtime-source manifest"
+                )
+            learned_source = source
 
             checkpoint_key = (result.algorithm, result.checkpoint_sha256)
             previous_checkpoint = learned_checkpoint_owners.get(checkpoint_key)
