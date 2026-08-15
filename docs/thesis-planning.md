@@ -64,18 +64,18 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 | 顺序扰动 evaluator | 已实现，待最终 checkpoint 生成正式 artifact |
 | attention/TTC 导出和 heatmap | 已实现，待最终 checkpoint 生成正式 artifact |
 | 跨车辆数 checkpoint 兼容协议 | 未设计完成 |
-| 最终统计检验与论文结果归档 | 未完成 |
+| 多 seed 配对统计与论文绘图工具 | 已实现，待正式 artifact |
+| 最终统计结果审定与论文归档 | 未完成 |
 
 当前只能把历史 MAPPO/CA-ComMAPPO seed 1 作为预实验参考；provenance v1 结果不进入
 新的正式聚合，不能形成跨算法论文结论。
 
 ## 实施顺序
 
-1. 实现顺序扰动、attention/TTC 导出和统计绘图工具，并先冻结评估协议。
-2. 在同一提交上 smoke 全算法，冻结算法矩阵和训练 seed 集 `[1,2,3]`。
-3. 在最终冻结提交上依次重跑 MAPPO、Attention-MAPPO、CA-ComMAPPO/no-prior，随后
+1. 在同一提交上 smoke 全算法，冻结算法矩阵和训练 seed 集 `[1,2,3]`。
+2. 在最终冻结提交上依次重跑 MAPPO、Attention-MAPPO、CA-ComMAPPO/no-prior，随后
    运行 IPPO、CommNet、IC3Net。
-4. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
+3. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
 
 本论文固定四车任务，不开展 4→6/8/10 checkpoint 泛化实验，也不声明规模泛化能力。
 

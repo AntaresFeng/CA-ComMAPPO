@@ -47,6 +47,12 @@
 - 固定 case 的配对统计只作辅助，不替代训练 seed 方差。
 - 生成主结果表、顺序扰动图、消融图和解释性图。
 
+已实现 `main.py paper-analysis`：它复用严格 final-test 聚合门禁，默认要求核心三组
+配对齐全，输出逐 seed 原始值、sample std、方向明确的配对效应量与精确双侧 sign-flip
+检验。三个 seed 的 p 值仅作探索性辅助。主结果、配对消融与顺序扰动图输出 PNG/PDF；
+CA trace 工具生成的 attention/TTC heatmap 构成解释性图。正式 artifact 尚待最终冻结
+提交上的多 seed 训练完成后生成。
+
 ## 阶段三：全算法 smoke 与源码冻结
 
 在最终源码上依次验证 MAPPO、Attention-MAPPO、CA-ComMAPPO full、CA-ComMAPPO

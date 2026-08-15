@@ -14,6 +14,7 @@ from ca_commappo.config import TRAINING_ENV_SEED_SCHEME, derive_training_env_see
 from ca_commappo.evaluation.aggregate_results import (
     AggregationError,
     aggregate,
+    aggregate_with_per_seed,
     algo_from_path,
     best_summary,
     load_records,
@@ -281,6 +282,32 @@ def test_aggregate_uses_metadata_seed_and_sample_std(tmp_path):
     assert row["arrival_rate_std"] == pytest.approx(math.sqrt(0.08))
     # A population std would be 1.0; final tables require sample stdev sqrt(2).
     assert row["mean_episode_reward_std"] == pytest.approx(math.sqrt(2.0))
+
+
+def test_strict_aggregate_exposes_validated_per_seed_values(tmp_path):
+    second = _write_run(
+        tmp_path,
+        "mappo",
+        "second",
+        2,
+        [_record(0.6, 0.4, 4.0)],
+    )
+    first = _write_run(
+        tmp_path,
+        "mappo",
+        "first",
+        1,
+        [_record(0.2, 0.8, 2.0)],
+    )
+
+    _aggregate_rows, per_seed_rows = aggregate_with_per_seed(
+        [second, first], expected_seeds=[1, 2]
+    )
+
+    assert [row["seed"] for row in per_seed_rows] == [1, 2]
+    assert [row["arrival_rate"] for row in per_seed_rows] == [0.2, 0.6]
+    assert all(row["checkpoint_sha256"] for row in per_seed_rows)
+    assert {row["source_commit"] for row in per_seed_rows} == {SOURCE_COMMIT}
 
 
 def test_single_seed_std_is_zero(tmp_path):

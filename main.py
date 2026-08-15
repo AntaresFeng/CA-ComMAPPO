@@ -6,6 +6,7 @@ COMMAND_MODULES = {
     "debug-wrapper": "ca_commappo.envs.debug_highway_wrapper",
     "ippo": "ca_commappo.training.train_highway_intersection",
     "mappo": "ca_commappo.training.train_highway_intersection",
+    "paper-analysis": "ca_commappo.evaluation.paper_analysis",
     "sanity": "ca_commappo.cli.run_sanity_baseline",
 }
 

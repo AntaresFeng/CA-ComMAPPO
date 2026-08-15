@@ -712,6 +712,63 @@ def aggregate(
     ``expected_seeds`` applies to every algorithm present.  Each algorithm must have
     exactly that seed set; missing and unexpected seeds are errors, never omissions.
     """
+    rows, _per_seed_rows = aggregate_with_per_seed(
+        jsonl_paths,
+        expected_seeds=expected_seeds,
+        expected_seeds_by_algorithm=expected_seeds_by_algorithm,
+    )
+    return rows
+
+
+def aggregate_with_per_seed(
+    jsonl_paths: Iterable[str | Path],
+    *,
+    expected_seeds: Iterable[int] | None = None,
+    expected_seeds_by_algorithm: Mapping[str, Iterable[int]] | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """Return strict aggregate rows and their validated per-seed observations."""
+    by_algo = _collect_final_results(
+        jsonl_paths,
+        expected_seeds=expected_seeds,
+        expected_seeds_by_algorithm=expected_seeds_by_algorithm,
+    )
+
+    rows: list[dict] = []
+    per_seed_rows: list[dict] = []
+    for algorithm in sorted(by_algo):
+        results = sorted(by_algo[algorithm], key=lambda result: result.seed)
+        row: dict[str, object] = {"algorithm": algorithm, "seeds": len(results)}
+        for result in results:
+            per_seed_rows.append(
+                {
+                    "algorithm": algorithm,
+                    "seed": result.seed,
+                    "checkpoint_sha256": result.checkpoint_sha256,
+                    "source_commit": result.source_commit,
+                    "runtime_source_sha256": result.runtime_source_sha256,
+                    "training_device": result.training_device,
+                    **{metric: float(result.summary[metric]) for metric in METRICS},
+                }
+            )
+        for metric in METRICS:
+            values = [float(result.summary[metric]) for result in results]
+            row[f"{metric}_mean"] = statistics.mean(values)
+            if algorithm in _STATIC_BASELINE_ALGORITHMS:
+                row[f"{metric}_std"] = None
+            else:
+                row[f"{metric}_std"] = (
+                    statistics.stdev(values) if len(values) > 1 else 0.0
+                )
+        rows.append(row)
+    return rows, per_seed_rows
+
+
+def _collect_final_results(
+    jsonl_paths: Iterable[str | Path],
+    *,
+    expected_seeds: Iterable[int] | None,
+    expected_seeds_by_algorithm: Mapping[str, Iterable[int]] | None,
+) -> dict[str, list[_FinalResult]]:
     if expected_seeds is not None and expected_seeds_by_algorithm is not None:
         raise AggregationError(
             "use either global expected_seeds or expected_seeds_by_algorithm"
@@ -819,21 +876,7 @@ def aggregate(
                     f"unexpected={sorted(actual - expected)}"
                 )
 
-    rows: list[dict] = []
-    for algorithm in sorted(by_algo):
-        results = sorted(by_algo[algorithm], key=lambda result: result.seed)
-        row: dict[str, object] = {"algorithm": algorithm, "seeds": len(results)}
-        for metric in METRICS:
-            values = [float(result.summary[metric]) for result in results]
-            row[f"{metric}_mean"] = statistics.mean(values)
-            if algorithm in _STATIC_BASELINE_ALGORITHMS:
-                row[f"{metric}_std"] = None
-            else:
-                row[f"{metric}_std"] = (
-                    statistics.stdev(values) if len(values) > 1 else 0.0
-                )
-        rows.append(row)
-    return rows
+    return by_algo
 
 
 def load_runs_manifest(path: str | Path) -> tuple[list[str], dict[str, list[int]]]:

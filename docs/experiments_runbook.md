@@ -202,6 +202,36 @@ v2 manifest 完成历史聚合，不要求聚合命令运行在训练时 checkou
 所有学习算法仍必须来自同一 Git commit 和 runtime manifest。学习策略报告 sample
 std；静态 baseline 是固定策略点估计，std 留空。
 
+核心四算法 final test 齐备后，用同一个严格 manifest 生成论文统计目录：
+
+```bash
+UV_CACHE_DIR=/tmp/ca-commappo-uv-cache \
+MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache \
+uv run python main.py paper-analysis \
+  --runs-manifest results/final_runs_manifest.json \
+  --output-dir results/paper_analysis_final \
+  --order-summary mappo=runs/mappo_highway/<order-run>/order_robustness_summary.json \
+  --order-summary attention_mappo=runs/attention_mappo_highway/<order-run>/order_robustness_summary.json
+```
+
+默认要求并按相同训练 seed 配对三个预注册差值：
+
+- `Attention-MAPPO − MAPPO`；
+- `CA-ComMAPPO − Attention-MAPPO`；
+- `CA-ComMAPPO full − CA-ComMAPPO no-prior`。
+
+输出目录已存在时命令拒绝覆盖。`main_results.csv`/`.md` 和
+`per_seed_metrics.csv` 保存 mean、sample std 与逐 seed 原始值；
+`paired_deltas.csv`/`paired_summary.csv` 保存方向明确的逐 seed 差值和精确双侧
+sign-flip p 值；主结果、消融和可选顺序扰动图同时输出 PNG/PDF。三个训练 seed 下
+sign-flip 检验分辨率很粗，只作探索性辅助，不替代效应量、原始值和 sample std。
+`--allow-partial-comparisons` 只供开发期验证绘图管线，不能生成最终论文统计。
+
+顺序扰动输入会连同相邻 metadata、checkpoint SHA 和 provenance v2 一起校验，并要求
+正式 cases `20000..20099`、permutation seeds `30000..30002`，且 source commit/runtime
+与 final-test manifest 一致。其 error bar 是固定 case 间 sample std，不得解释成跨训练
+seed 方差。
+
 ## 5. 阶段收尾
 
 每一阶段至少记录：
