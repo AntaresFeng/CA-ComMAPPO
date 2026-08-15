@@ -590,6 +590,46 @@ def test_order_eval_runs_baseline_and_each_permutation_seed(tmp_path, monkeypatc
     assert sorted(artifact_call["perturbed_results"]) == [30_000, 30_001]
 
 
+def test_ca_trace_smoke_uses_one_case_and_writes_artifacts(tmp_path, monkeypatch):
+    configs = Namespace(
+        agent="CA_COMMAPPO",
+        seed=1,
+        smoke=True,
+        model_dir_load="models/best_model.pth",
+        final_eval_seed=20_000,
+    )
+    agent = FakeAgent(tmp_path / "trace_run")
+    collected = {}
+
+    monkeypatch.setattr(
+        mappo_training,
+        "load_model_provenance",
+        lambda **_kwargs: {"verification": "sidecar_sha256_verified"},
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "collect_ca_trace_episodes",
+        lambda **kwargs: collected.update(kwargs) or [{"episode_seed": 20_000}],
+    )
+    monkeypatch.setattr(
+        mappo_training,
+        "write_ca_trace_artifacts",
+        lambda **_kwargs: {
+            "metadata": tmp_path / "metadata.json",
+            "records": tmp_path / "records.jsonl",
+            "summary": tmp_path / "summary.json",
+            "plots": [tmp_path / "plot.png", tmp_path / "plot.pdf"],
+            "summary_payload": {"episode_summary": {"episodes": 1}},
+        },
+    )
+    monkeypatch.setattr(mappo_training, "print_highway_summary", lambda _summary: None)
+
+    mappo_training.ca_trace_test(configs, agent)
+
+    assert agent.loaded_model_path == "models/best_model.pth"
+    assert collected["protocol"]["episode_seeds"] == [20_000]
+
+
 def test_benchmark_train_segments_preserve_exact_budget_and_short_tail():
     configs = Namespace(running_steps=48, parallels=4, eval_interval=20)
 

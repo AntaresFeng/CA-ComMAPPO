@@ -149,6 +149,25 @@ ego、global state 和 agent mask 不变。run 输出 `order_robustness_metadata
 `order_robustness_summary.json`。这些 case 内差值用于 H2 辅助证据，不替代跨训练 seed
 方差。
 
+### CA attention/TTC trace
+
+完整 CA-ComMAPPO 与 no-prior 的 seed 1 best checkpoint 分别运行：
+
+```bash
+WANDB_MODE=offline MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache \
+uv run python main.py mappo \
+  --config configs/ca_commappo/intersection-multi-agent-v1.yaml \
+  --mode ca-trace --seed 1 \
+  --model-dir-load runs/ca_commappo_highway/<benchmark-run>/models/best_model.pth
+```
+
+no-prior 只替换为 `intersection-multi-agent-v1-no-prior.yaml`。正式模式固定 cases
+`20000..20009`，要求严格 provenance v2、训练 seed 1 和干净源码。只读 trace 逐动作
+导出 active mask、scaled TTC、intent、effective lambda、attention、动作、normalized
+ego 轨迹和结局，输出 `ca_trace_metadata.json`、`ca_trace_records.jsonl`、
+`ca_trace_summary.json`，以及逐 case/全 cases 的 PNG/PDF attention heatmap。heatmap
+是解释性证据，不能替代多 seed 安全与成功指标。
+
 ### 正式聚合
 
 不要用宽泛 glob 直接生成论文表。先人工检查每个 final run，再建立显式 manifest：

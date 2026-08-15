@@ -70,3 +70,17 @@ def test_legacy_unconstrained_lambda_key_is_rejected():
 
     with pytest.raises(RuntimeError, match="unconstrained lam"):
         policy.load_state_dict(legacy, strict=False)
+
+
+def test_policy_trace_context_restores_after_exception():
+    policy = _policy()
+    sink = lambda _trace: None
+
+    with (
+        pytest.raises(RuntimeError, match="evaluation failed"),
+        policy.communication_trace(sink),
+    ):
+        assert policy._communication_trace_sink is sink
+        raise RuntimeError("evaluation failed")
+
+    assert policy._communication_trace_sink is None

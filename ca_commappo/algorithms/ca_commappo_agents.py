@@ -16,7 +16,7 @@ input dim auto-includes the comm context). ``CA_ComMAPPO_Policy`` /
 from __future__ import annotations
 
 from argparse import Namespace
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 
 import numpy as np
@@ -81,6 +81,7 @@ class CAComMAPPOActorRep(Module):
         self.n_agents = int(n_agents)
         self.ttc_max = float(ttc_max)
         self._runtime_agent_mask: torch.Tensor | np.ndarray | None = None
+        self._runtime_trace_sink: Callable[[dict], None] | None = None
 
         hidden = self.hidden_sizes[-1]
         self.comm_dim = int(comm_dim) if comm_dim is not None else hidden
@@ -115,6 +116,17 @@ class CAComMAPPOActorRep(Module):
             yield
         finally:
             self._runtime_agent_mask = previous
+
+    @contextmanager
+    def communication_trace(
+        self, sink: Callable[[dict], None] | None
+    ) -> Iterator[None]:
+        previous = self._runtime_trace_sink
+        self._runtime_trace_sink = sink
+        try:
+            yield
+        finally:
+            self._runtime_trace_sink = previous
 
     def _agent_mask(self, agent_mask, n_env: int) -> torch.Tensor:
         source = self._runtime_agent_mask if agent_mask is None else agent_mask
@@ -174,6 +186,19 @@ class CAComMAPPOActorRep(Module):
 
         alive = self._agent_mask(agent_mask, n_env)
         c = self.comm(m, alive)  # (E, A, comm_dim)
+        if self._runtime_trace_sink is not None:
+            with torch.no_grad():
+                alpha = self.comm.attention(m.detach(), alive.detach())
+            self._runtime_trace_sink(
+                {
+                    "active_mask": alive.detach().cpu().clone(),
+                    "scaled_ttc": ttc.detach().cpu().clone(),
+                    "intent": intent.detach().cpu().clone(),
+                    "attention": alpha.detach().cpu().clone(),
+                    "effective_lambda": self.comm.lambda_value.detach().cpu().clone(),
+                    "use_conflict_prior": self.comm.use_conflict_prior,
+                }
+            )
 
         state = torch.cat([z, c], dim=-1)  # (E, A, H+comm_dim)
         state = state.reshape(batch, -1)  # (B, H+comm_dim)
@@ -188,6 +213,7 @@ class CA_ComMAPPO_Policy(MAAC_Policy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._communication_agent_mask = None
+        self._communication_trace_sink = None
         self.register_buffer(
             "_communication_contract_version",
             torch.tensor(CA_COMMUNICATION_CONTRACT_VERSION, dtype=torch.int64),
@@ -203,11 +229,25 @@ class CA_ComMAPPO_Policy(MAAC_Policy):
         finally:
             self._communication_agent_mask = previous
 
+    @contextmanager
+    def communication_trace(
+        self, sink: Callable[[dict], None] | None
+    ) -> Iterator[None]:
+        previous = self._communication_trace_sink
+        self._communication_trace_sink = sink
+        try:
+            yield
+        finally:
+            self._communication_trace_sink = previous
+
     def forward(self, *args, **kwargs):
         with ExitStack() as stack:
             for representation in self.actor_representation.values():
                 stack.enter_context(
                     representation.communication_mask(self._communication_agent_mask)
+                )
+                stack.enter_context(
+                    representation.communication_trace(self._communication_trace_sink)
                 )
             return super().forward(*args, **kwargs)
 
@@ -373,6 +413,11 @@ class CA_ComMAPPO_Agents(MAPPO_Agents):
                 test_mode=test_mode,
                 **kwargs,
             )
+
+    @contextmanager
+    def communication_trace(self, sink: Callable[[dict], None]) -> Iterator[None]:
+        with self.policy.communication_trace(sink):
+            yield
 
     def store_experience(
         self,

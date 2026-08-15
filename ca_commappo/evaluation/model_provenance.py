@@ -44,6 +44,7 @@ _NON_TRAINING_CONFIG_KEYS = {
     "run_id",
     "seed",
     "test_mode",
+    "trace_episodes",
     "video_combined",
     "video_contact_sheet",
     "video_dir",

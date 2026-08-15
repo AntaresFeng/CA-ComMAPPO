@@ -76,6 +76,12 @@ minibatch 的 agent mask 传入 representation；自定义 learner 只建立 mas
 原 MAPPO update，不复制 PPO loss。critic 使用独立的 permutation-invariant
 representation，不接收通信上下文。
 
+actor representation 还提供异常安全的只读 trace context。仅在 `ca-trace` 评估模式
+显式启用时，它复制导出 active mask、scaled TTC、intent、effective lambda 和
+`alpha_ij`；正常训练与推理不保存 trace，开启 trace 也不改变 policy 输出。trace
+evaluator 另外记录动作、normalized ego 轨迹、reward 和结局，并只在 sender/receiver
+都有效的时刻计算平均 attention heatmap。
+
 ## 观测与可比性前提
 
 - 当前观测特征为 `presence,x,y,vx,vy,cos_h,sin_h`，第 0 行是 ego。

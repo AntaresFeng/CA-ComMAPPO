@@ -19,6 +19,12 @@ from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     register_highway_intersection_env,
 )
+from ca_commappo.evaluation.ca_trace import (
+    CA_TRACE_EPISODE_COUNT,
+    ca_trace_protocol,
+    collect_ca_trace_episodes,
+    write_ca_trace_artifacts,
+)
 from ca_commappo.evaluation.highway_metrics import (
     print_highway_summary,
     summarize_episode_records,
@@ -98,11 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("train", "test", "benchmark", "order-eval"),
+        choices=("train", "test", "benchmark", "order-eval", "ca-trace"),
         default="train",
         help=(
             "train runs one training job; test loads a model; benchmark alternates "
-            "train/test; order-eval performs paired observation-order perturbations."
+            "train/test; order-eval performs paired observation-order perturbations; "
+            "ca-trace exports CA attention/TTC traces."
         ),
     )
     parser.add_argument("--parallels", type=int, default=None)
@@ -137,6 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         default=None,
         help="Diagnostic override for the fixed order-eval seeds 30000 30001 30002.",
+    )
+    parser.add_argument(
+        "--trace-episodes",
+        type=int,
+        default=None,
+        help="Diagnostic override; formal ca-trace uses 10 cases.",
     )
     parser.add_argument(
         "--allow-unverified-model",
@@ -228,8 +241,9 @@ def cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
         "output_dir": args.output_dir,
         "model_dir_load": args.model_dir_load,
         "order_permutation_seeds": args.order_permutation_seeds,
+        "trace_episodes": args.trace_episodes,
         "allow_unverified_model": args.allow_unverified_model,
-        "test_mode": args.mode in {"test", "order-eval"},
+        "test_mode": args.mode in {"test", "order-eval", "ca-trace"},
         "record_video": args.record_video,
         "video_episodes": args.video_episodes,
         "video_dir": args.video_dir,
@@ -567,6 +581,56 @@ def order_robustness_test(configs: argparse.Namespace, agents) -> None:
     print(f"Order-robustness summary saved: {paths['summary']}")
 
 
+def ca_trace_test(configs: argparse.Namespace, agents) -> None:
+    if str(configs.agent).upper() != "CA_COMMAPPO":
+        raise ValueError("ca-trace is only supported for CA-ComMAPPO configurations")
+    model_path = getattr(configs, "model_dir_load", None) or configs.model_dir
+    model_provenance = load_model_provenance(
+        model_path=model_path,
+        expected_training_seed=configs.seed,
+        expected_configs=configs,
+        allow_unverified=bool(getattr(configs, "allow_unverified_model", False)),
+    )
+    if model_provenance.get("verification") != VERIFIED_PROVENANCE:
+        raise ValueError("ca-trace requires a strictly verified provenance v2 model")
+    agents.load_model(path=model_path)
+
+    smoke = bool(getattr(configs, "smoke", False))
+    requested_episodes = getattr(configs, "trace_episodes", None)
+    episode_count = int(
+        requested_episodes
+        if requested_episodes is not None
+        else (1 if smoke else CA_TRACE_EPISODE_COUNT)
+    )
+    if not smoke:
+        if int(configs.seed) != 1:
+            raise ValueError("formal ca-trace requires the training seed 1 checkpoint")
+        if int(configs.final_eval_seed) != 20_000:
+            raise ValueError("formal ca-trace requires cases beginning at seed 20000")
+        if episode_count != CA_TRACE_EPISODE_COUNT:
+            raise ValueError("formal ca-trace requires exactly 10 cases")
+    protocol = ca_trace_protocol(
+        base_seed=int(configs.final_eval_seed), episode_count=episode_count
+    )
+    episodes = collect_ca_trace_episodes(
+        configs=configs,
+        agents=agents,
+        protocol=protocol,
+    )
+    paths = write_ca_trace_artifacts(
+        output_dir=agents.log_dir,
+        configs=configs,
+        protocol=protocol,
+        model_provenance=model_provenance,
+        episodes=episodes,
+    )
+    print_highway_summary(paths["summary_payload"]["episode_summary"])
+    print(f"CA trace metadata saved: {paths['metadata']}")
+    print(f"CA trace records saved: {paths['records']}")
+    print(f"CA trace summary saved: {paths['summary']}")
+    print(f"CA trace plots saved: {len(paths['plots'])} files")
+
+
 def benchmark(
     configs: argparse.Namespace,
     agents,
@@ -692,7 +756,7 @@ def _save_best_model_with_provenance(
 
 
 def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None:
-    if mode in {"benchmark", "test", "order-eval"} and not bool(
+    if mode in {"benchmark", "test", "order-eval", "ca-trace"} and not bool(
         getattr(configs, "smoke", False)
     ):
         require_clean_source_checkout()
@@ -718,6 +782,8 @@ def run(configs: argparse.Namespace, mode: str, save_model: bool = True) -> None
             test(configs, agents, envs)
         elif mode == "order-eval":
             order_robustness_test(configs, agents)
+        elif mode == "ca-trace":
+            ca_trace_test(configs, agents)
         else:
             train(configs, agents, save_model=save_model)
     finally:

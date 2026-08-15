@@ -103,6 +103,51 @@ class TestOutputContract:
             assert rep._runtime_agent_mask is mask
         assert rep._runtime_agent_mask is None
 
+    def test_trace_is_read_only_and_exports_masked_attention_contract(self):
+        rep = _build_rep(n_agents=3, hidden=16)
+        obs = _obs_for_agents(
+            [
+                _ego_row(1.0, 0.0, -1.0, 0.0, -1.0, 0.0),
+                _ego_row(0.0, 1.0, 0.0, -1.0, 0.0, -1.0),
+                _ego_row(-1.0, 0.0, 1.0, 0.0, 1.0, 0.0),
+            ]
+        )
+        mask = torch.tensor([[1.0, 1.0, 0.0]])
+        baseline = rep(obs, agent_mask=mask)["state"]
+        traces = []
+
+        with rep.communication_trace(traces.append):
+            traced = rep(obs, agent_mask=mask)["state"]
+
+        assert torch.equal(baseline, traced)
+        assert len(traces) == 1
+        trace = traces[0]
+        assert torch.equal(trace["active_mask"], mask)
+        assert trace["scaled_ttc"].shape == (1, 3)
+        assert trace["intent"].shape == (1, 3)
+        assert trace["attention"].shape == (1, 3, 3)
+        assert torch.allclose(trace["attention"][0, :2].sum(dim=-1), torch.ones(2))
+        assert torch.equal(trace["attention"][0, 2], torch.zeros(3))
+        assert trace["effective_lambda"].item() == pytest.approx(1.0)
+        assert trace["use_conflict_prior"] is True
+        assert rep._runtime_trace_sink is None
+
+    def test_trace_context_restores_after_sink_exception(self):
+        rep = _build_rep(n_agents=2, hidden=16)
+        obs = _obs_for_agents(
+            [_ego_row(1, 0, -1, 0, -1, 0), _ego_row(-1, 0, 1, 0, 1, 0)]
+        )
+
+        def fail(_trace):
+            raise RuntimeError("trace sink failed")
+
+        with (
+            pytest.raises(RuntimeError, match="trace sink failed"),
+            rep.communication_trace(fail),
+        ):
+            rep(obs)
+        assert rep._runtime_trace_sink is None
+
 
 class TestTTCIntent:
     def test_approaching_ego_gets_finite_ttc_and_intent_one(self):
