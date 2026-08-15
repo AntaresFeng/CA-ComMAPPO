@@ -8,7 +8,6 @@ sort key (``_summary_sort_key``) must NOT change.
 
 from __future__ import annotations
 
-
 import pytest
 
 from ca_commappo.evaluation.highway_metrics import (

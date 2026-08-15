@@ -16,8 +16,8 @@ from ca_commappo.evaluation.aggregate_results import (
     aggregate,
     algo_from_path,
     best_summary,
-    load_runs_manifest,
     load_records,
+    load_runs_manifest,
     main,
 )
 from ca_commappo.evaluation.highway_metrics import summarize_episode_records
@@ -151,9 +151,7 @@ def _write_run(
     for source_record in records:
         record = dict(source_record)
         requested_summary = dict(record["summary"])
-        arrival_count = round(
-            float(requested_summary["arrival_rate"]) * episode_count
-        )
+        arrival_count = round(float(requested_summary["arrival_rate"]) * episode_count)
         collision_count = round(
             float(requested_summary["collision_rate"]) * episode_count
         )
@@ -206,9 +204,7 @@ def _write_run(
     }
     if model_provenance is not None:
         metadata["model_provenance"] = model_provenance
-    (run_dir / "eval_metadata.json").write_text(
-        json.dumps(metadata), encoding="utf-8"
-    )
+    (run_dir / "eval_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     return records_path
 
 
@@ -430,9 +426,7 @@ def test_rejects_metadata_episode_count_that_disagrees_with_summary(tmp_path):
 def test_expected_seeds_requires_exact_set_for_each_algorithm(tmp_path):
     seed_1 = _write_run(tmp_path, "mappo", "seed-1", 1, [_record(0.1, 0.9, 1.0)])
     seed_3 = _write_run(tmp_path, "mappo", "seed-3", 3, [_record(0.3, 0.7, 3.0)])
-    with pytest.raises(
-        AggregationError, match=r"missing=\[2\], unexpected=\[3\]"
-    ):
+    with pytest.raises(AggregationError, match=r"missing=\[2\], unexpected=\[3\]"):
         aggregate([seed_1, seed_3], expected_seeds=[1, 2])
 
 

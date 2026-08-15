@@ -25,13 +25,11 @@ The same class serves both the actor and the MAPPO global-state critic:
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence, Union
+from collections.abc import Callable, Sequence
 
 import numpy as np
-
 from xuance.torch import Module
 from xuance.torch.utils import ModuleType, mlp_block, nn, torch
-
 
 # highway-env intersection observation layout (see configs/mappo/*.yaml):
 #   features = [presence, x, y, vx, vy, cos_h, sin_h], vehicles_count = 15.
@@ -54,10 +52,10 @@ class PermutationInvariantAttention(Module):
         self,
         input_shape: Sequence[int],
         hidden_sizes: Sequence[int],
-        normalize: Optional[ModuleType] = None,
-        initialize: Optional[Callable[..., torch.Tensor]] = None,
-        activation: Optional[ModuleType] = None,
-        device: Optional[Union[str, int, torch.device]] = None,
+        normalize: ModuleType | None = None,
+        initialize: Callable[..., torch.Tensor] | None = None,
+        activation: ModuleType | None = None,
+        device: str | int | torch.device | None = None,
         **kwargs,
     ):
         super().__init__()

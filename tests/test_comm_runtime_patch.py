@@ -10,11 +10,13 @@ exactly what CommNet's own training rollout (``run_episodes``) uses.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 
 class _FakeComm:
     """Minimal stand-in for a CommNet/IC3Net agents object."""
 
-    agent_keys = ["agent_0", "agent_1"]
+    agent_keys: ClassVar[list[str]] = ["agent_0", "agent_1"]
 
     def __init__(self) -> None:
         self.last_info = "untouched"
@@ -57,7 +59,7 @@ def test_info_default_wrapper_passes_through_when_info_is_supplied():
     from ca_commappo.algorithms.comm_runtime_patch import _make_info_default_wrapper
 
     class _Fake:
-        agent_keys = ["agent_0", "agent_1"]
+        agent_keys: ClassVar[list[str]] = ["agent_0", "agent_1"]
 
         def __init__(self) -> None:
             self.last_info = None
@@ -92,8 +94,9 @@ def test_info_default_wrapper_passes_through_when_info_is_supplied():
 
 
 def test_patch_targets_both_classes_and_is_idempotent():
-    from ca_commappo.algorithms.comm_runtime_patch import patch_comm_agents_info
     from xuance.torch.agents import CommNet_Agents, IC3Net_Agents
+
+    from ca_commappo.algorithms.comm_runtime_patch import patch_comm_agents_info
 
     patch_comm_agents_info()
     assert getattr(CommNet_Agents.action, "_ca_commappo_info_patch", False) is True

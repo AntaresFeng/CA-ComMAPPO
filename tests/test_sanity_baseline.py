@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from argparse import Namespace
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -28,8 +29,9 @@ from ca_commappo.evaluation.sanity_eval_artifacts import (
     write_sanity_eval_artifacts,
 )
 
-
 STRICT_CONFIG = Path("configs/sanity/highway_intersection_final.yaml")
+
+
 def test_strict_config_reuses_task_config_and_defines_exact_final_seeds():
     config = load_sanity_config(STRICT_CONFIG)
     canonical_highway_config = yaml.safe_load(
@@ -46,9 +48,10 @@ def test_strict_config_reuses_task_config_and_defines_exact_final_seeds():
     assert config.highway_config["collision_reward"] == -40
     assert config.highway_config["high_speed_reward"] == 0.01
     assert config.highway_config["arrived_reward"] == 10
-    assert config.highway_config["observation"]["observation_config"][
-        "vehicles_count"
-    ] == 15
+    assert (
+        config.highway_config["observation"]["observation_config"]["vehicles_count"]
+        == 15
+    )
     assert strict_episode_seeds(config) == list(range(20_000, 20_100))
     assert strict_evaluation_protocol(config, "random") == {
         "type": "fixed_explicit_episode_seeds",
@@ -115,8 +118,8 @@ def test_run_episode_keeps_raw_env_seed_and_uses_child_action_stream(monkeypatch
     config = load_sanity_config(STRICT_CONFIG)
 
     class FakeEnv:
-        agents = ["agent_0", "agent_1"]
-        action_space = {
+        agents: ClassVar[list[str]] = ["agent_0", "agent_1"]
+        action_space: ClassVar[dict[str, spaces.Discrete]] = {
             "agent_0": spaces.Discrete(3),
             "agent_1": spaces.Discrete(3),
         }
@@ -282,9 +285,7 @@ def test_strict_artifacts_encode_policy_specific_action_semantics(
     assert records_paths["random"].parent.parent.name == "random_highway"
     assert records_paths["idle-only"].parent.parent.name == "idle_only_highway"
     random_record = json.loads(records_paths["random"].read_text(encoding="utf-8"))
-    idle_record = json.loads(
-        records_paths["idle-only"].read_text(encoding="utf-8")
-    )
+    idle_record = json.loads(records_paths["idle-only"].read_text(encoding="utf-8"))
     random_metadata = json.loads(
         records_paths["random"]
         .with_name("eval_metadata.json")
@@ -293,17 +294,13 @@ def test_strict_artifacts_encode_policy_specific_action_semantics(
     assert random_record["evaluation_protocol"]["deterministic_actions"] is False
     assert random_record["evaluation_protocol"]["reproducible_actions"] is True
     assert (
-        random_record["evaluation_protocol"]["action_selection_mode"]
-        == "seeded_random"
+        random_record["evaluation_protocol"]["action_selection_mode"] == "seeded_random"
     )
-    assert random_metadata["evaluation_protocol"] == random_record[
-        "evaluation_protocol"
-    ]
-    assert idle_record["evaluation_protocol"]["deterministic_actions"] is True
     assert (
-        idle_record["evaluation_protocol"]["action_selection_mode"]
-        == "fixed_policy"
+        random_metadata["evaluation_protocol"] == random_record["evaluation_protocol"]
     )
+    assert idle_record["evaluation_protocol"]["deterministic_actions"] is True
+    assert idle_record["evaluation_protocol"]["action_selection_mode"] == "fixed_policy"
     rows = aggregate(records_paths.values(), expected_seeds=[1])
     assert [row["algorithm"] for row in rows] == ["idle_only", "random"]
 

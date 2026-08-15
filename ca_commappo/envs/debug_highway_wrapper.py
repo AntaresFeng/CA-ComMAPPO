@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             run_raw_episode(args, complete_config, action_plan)
         if args.target in {"wrapper", "both"}:
             run_wrapper_episode(args, highway_config, action_plan)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - CLI boundary reports failures as exit 1.
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
@@ -210,7 +210,7 @@ def _merge_json_source(base: dict[str, Any], source: Any, label: str) -> dict[st
         source.read_text(encoding="utf-8") if isinstance(source, Path) else source
     )
     if not isinstance(loaded, dict):
-        raise ValueError(f"{label} must contain a JSON object")
+        raise TypeError(f"{label} must contain a JSON object")
     return deep_merge(base, loaded)
 
 

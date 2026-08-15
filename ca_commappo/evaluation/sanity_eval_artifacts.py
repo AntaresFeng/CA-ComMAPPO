@@ -31,15 +31,13 @@ def write_sanity_eval_artifacts(
 ) -> dict[str, Path]:
     """Write one aggregator-compatible final-test run per requested policy."""
     artifact_root = Path(artifact_root)
-    timestamp = created_at or datetime.now().astimezone().strftime(
-        "%Y%m%d_%H%M%S_%f"
-    )
+    timestamp = created_at or datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
     paths: dict[str, Path] = {}
 
     for policy, policy_results in results["policies"].items():
         protocol = policy_results.get("evaluation_protocol")
         if not isinstance(protocol, dict):
-            raise ValueError(
+            raise TypeError(
                 "comparable sanity artifacts require a per-policy strict "
                 "evaluation_protocol"
             )

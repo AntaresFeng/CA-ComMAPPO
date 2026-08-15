@@ -2,7 +2,6 @@ import argparse
 from importlib import import_module
 from typing import Any
 
-
 COMMAND_MODULES = {
     "debug-wrapper": "ca_commappo.envs.debug_highway_wrapper",
     "ippo": "ca_commappo.training.train_highway_intersection",
@@ -31,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     module = import_module(COMMAND_MODULES[args.command])
-    command_main: Any = getattr(module, "main")
+    command_main: Any = module.main
     return int(command_main(args.args))
 
 

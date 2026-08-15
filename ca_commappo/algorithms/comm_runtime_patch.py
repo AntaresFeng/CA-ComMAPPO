@@ -19,7 +19,8 @@ monkey-patches the class method at runtime, mirroring ``xuance_compat.py``.
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _PATCH_FLAG = "_ca_commappo_info_patch"
 

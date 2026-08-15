@@ -8,10 +8,10 @@ from ca_commappo.evaluation.highway_metrics import (
     save_results_json,
 )
 from ca_commappo.evaluation.sanity_baseline_runner import (
+    SUPPORTED_POLICIES,
     SanityConfig,
     load_sanity_config,
     run_sanity_baseline,
-    SUPPORTED_POLICIES,
 )
 from ca_commappo.evaluation.sanity_eval_artifacts import (
     write_sanity_eval_artifacts,
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             for policy, records_path in artifact_paths.items():
                 print(f"artifact[{policy}]={records_path}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - CLI boundary reports failures as exit 1.
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0

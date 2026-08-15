@@ -6,7 +6,6 @@ from typing import Any
 
 import numpy as np
 
-
 SCHEMA_VERSION = 1
 EVAL_METADATA_FILENAME = "eval_metadata.json"
 EVAL_RECORDS_FILENAME = "eval_records.jsonl"

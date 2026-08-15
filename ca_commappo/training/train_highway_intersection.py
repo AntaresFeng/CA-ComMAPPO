@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import wandb
 from xuance.environment import make_envs
-from xuance.torch.agents import IPPO_Agents, MAPPO_Agents, CommNet_Agents, IC3Net_Agents
+from xuance.torch.agents import CommNet_Agents, IC3Net_Agents, IPPO_Agents, MAPPO_Agents
 from xuance.torch.utils.operations import set_seed
 
 from ca_commappo.algorithms import register_components
@@ -18,16 +18,10 @@ from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     register_highway_intersection_env,
 )
-
-from ca_commappo.evaluation.highway_metrics import print_highway_summary
 from ca_commappo.evaluation.highway_metrics import (
+    print_highway_summary,
     summarize_episode_records,
     summary_to_log_infos,
-)
-from ca_commappo.evaluation.mappo_highway_metrics import (
-    HighwayMetricsCallback,
-    evaluate_highway_policy,
-    is_better_highway_summary,
 )
 from ca_commappo.evaluation.mappo_eval_artifacts import (
     append_eval_record_jsonl,
@@ -35,14 +29,19 @@ from ca_commappo.evaluation.mappo_eval_artifacts import (
     build_eval_record,
     write_eval_metadata,
 )
-from ca_commappo.evaluation.model_provenance import (
-    BEST_MODEL_FILENAME,
-    load_model_provenance,
-    write_best_model_provenance,
+from ca_commappo.evaluation.mappo_highway_metrics import (
+    HighwayMetricsCallback,
+    evaluate_highway_policy,
+    is_better_highway_summary,
 )
 from ca_commappo.evaluation.mappo_video_recorder import (
     record_mappo_policy_videos,
     resolve_video_episode_count,
+)
+from ca_commappo.evaluation.model_provenance import (
+    BEST_MODEL_FILENAME,
+    load_model_provenance,
+    write_best_model_provenance,
 )
 from ca_commappo.training.mappo_run_layout import (
     align_wandb_run_name,
@@ -310,7 +309,9 @@ def fixed_seed_evaluation_protocol(
         "base_seed": int(base_seed),
         "episode_count": int(episode_count),
         "parallels": min(int(parallels), int(episode_count)),
-        "episode_seeds": list(range(int(base_seed), int(base_seed) + int(episode_count))),
+        "episode_seeds": list(
+            range(int(base_seed), int(base_seed) + int(episode_count))
+        ),
     }
 
 
@@ -396,9 +397,7 @@ def test(configs: argparse.Namespace, agents, envs) -> None:
         model_path=model_path,
         expected_training_seed=configs.seed,
         expected_configs=configs,
-        allow_unverified=bool(
-            getattr(configs, "allow_unverified_model", False)
-        ),
+        allow_unverified=bool(getattr(configs, "allow_unverified_model", False)),
     )
     agents.load_model(path=model_path)
     protocol = fixed_seed_evaluation_protocol(
@@ -451,9 +450,7 @@ def test(configs: argparse.Namespace, agents, envs) -> None:
             model_path=str(model_path),
             video_dir=video_dir,
             episode_count=video_episode_count,
-            base_seed=(
-                configs.final_eval_seed if video_seed is None else video_seed
-            ),
+            base_seed=(configs.final_eval_seed if video_seed is None else video_seed),
             make_contact_sheet=getattr(configs, "video_contact_sheet", True),
             make_combined_video=getattr(configs, "video_combined", True),
             model_provenance=model_provenance,
@@ -565,8 +562,8 @@ def benchmark(
     if save_model:
         agents.save_model(model_name="final_model.pth", model_path=configs.model_dir)
     print(
-        "Best Model Score: %.2f, std=%.2f"
-        % (best_scores_info["mean"], best_scores_info["std"])
+        f"Best Model Score: {best_scores_info['mean']:.2f}, "
+        f"std={best_scores_info['std']:.2f}"
     )
     print("Best Highway Metrics:")
     print_highway_summary(best_scores_info["summary"])

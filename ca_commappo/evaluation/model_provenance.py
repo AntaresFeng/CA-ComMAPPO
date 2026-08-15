@@ -200,9 +200,11 @@ def load_model_provenance(
     try:
         payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        raise ValueError(f"invalid checkpoint provenance JSON: {sidecar_path}") from error
+        raise ValueError(
+            f"invalid checkpoint provenance JSON: {sidecar_path}"
+        ) from error
     if not isinstance(payload, dict):
-        raise ValueError(f"checkpoint provenance must be an object: {sidecar_path}")
+        raise TypeError(f"checkpoint provenance must be an object: {sidecar_path}")
 
     _validate_sidecar_payload(
         payload,
@@ -251,7 +253,7 @@ def _validate_sidecar_payload(
     training_config = payload.get("training_config")
     training_config_hash = payload.get("training_config_sha256")
     if not isinstance(training_config, dict):
-        raise ValueError("checkpoint provenance training_config must be an object")
+        raise TypeError("checkpoint provenance training_config must be an object")
     if canonical_json_sha256(training_config) != training_config_hash:
         raise ValueError("checkpoint provenance training-config SHA-256 is invalid")
     if expected_configs is not None:
@@ -277,20 +279,23 @@ def _validate_sidecar_payload(
         value = payload.get(field)
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ValueError(f"checkpoint provenance {field} must be non-negative")
-    if not isinstance(payload.get("source_run_id"), str) or not payload[
-        "source_run_id"
-    ]:
+    if (
+        not isinstance(payload.get("source_run_id"), str)
+        or not payload["source_run_id"]
+    ):
         raise ValueError("checkpoint provenance source_run_id must be non-empty")
-    if not isinstance(payload.get("training_device"), str) or not payload[
-        "training_device"
-    ]:
+    if (
+        not isinstance(payload.get("training_device"), str)
+        or not payload["training_device"]
+    ):
         raise ValueError("checkpoint provenance training_device must be non-empty")
     if not isinstance(payload.get("selection_summary"), dict):
-        raise ValueError("checkpoint provenance selection_summary must be an object")
+        raise TypeError("checkpoint provenance selection_summary must be an object")
     selection_protocol = payload.get("selection_protocol")
-    if not isinstance(selection_protocol, dict) or selection_protocol.get(
-        "purpose"
-    ) != "checkpoint_selection":
+    if (
+        not isinstance(selection_protocol, dict)
+        or selection_protocol.get("purpose") != "checkpoint_selection"
+    ):
         raise ValueError(
             "checkpoint provenance must contain the checkpoint-selection protocol"
         )

@@ -358,8 +358,7 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
     assert rows[1]["step"] == 16
     assert len(evaluation_calls) == 2
     assert all(
-        call["protocol"]["episode_seeds"] == [10_000]
-        for call in evaluation_calls
+        call["protocol"]["episode_seeds"] == [10_000] for call in evaluation_calls
     )
     assert configs.env_seed == 21
     assert metadata["evaluation_protocol"]["episode_seeds"] == [10_000]
@@ -457,9 +456,7 @@ def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
     assert calls[0]["base_seed"] == 20_000
     assert calls[0]["make_contact_sheet"] is True
     assert calls[0]["make_combined_video"] is True
-    assert calls[0]["model_provenance"]["verification"] == (
-        "sidecar_sha256_verified"
-    )
+    assert calls[0]["model_provenance"]["verification"] == ("sidecar_sha256_verified")
 
 
 def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
@@ -583,9 +580,7 @@ def test_evaluate_fixed_seed_policy_batches_and_returns_exact_sorted_seed_set(
         log_prefix="Test-Highway",
     )
 
-    assert [record["seed"] for record in result["episodes"]] == list(
-        range(100, 105)
-    )
+    assert [record["seed"] for record in result["episodes"]] == list(range(100, 105))
     assert [env.env_seed for env in envs] == [100, 102, 104]
     assert [env.parallels for env in envs] == [2, 2, 1]
     assert all(env.closed for env in envs)
@@ -603,8 +598,6 @@ def test_evaluate_fixed_seed_policy_batches_and_returns_exact_sorted_seed_set(
         (Namespace(running_steps=16, parallels=4, eval_interval=10), "eval_interval"),
     ],
 )
-def test_benchmark_train_segments_reject_ambiguous_vector_budgets(
-    configs, message
-):
+def test_benchmark_train_segments_reject_ambiguous_vector_budgets(configs, message):
     with pytest.raises(ValueError, match=message):
         mappo_training.benchmark_train_segments(configs)

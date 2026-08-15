@@ -53,9 +53,7 @@ def test_aggregate_update_infos_preserves_keys_and_emits_mean_max():
     assert result["diagnostics/update_count"] == 2
     assert result["diagnostics/nonfinite_scalar_count_total"] == 2
     assert all(
-        math.isfinite(value)
-        for value in result.values()
-        if isinstance(value, float)
+        math.isfinite(value) for value in result.values() if isinstance(value, float)
     )
 
 
@@ -227,9 +225,7 @@ def test_learner_wrapper_computes_active_mask_ppo_diagnostics_and_restores_callb
     assert result["bad/value"] == 0.0
     assert result["diagnostics/nonfinite_scalar_count"] == 1
     assert all(
-        math.isfinite(value)
-        for value in result.values()
-        if isinstance(value, float)
+        math.isfinite(value) for value in result.values() if isinstance(value, float)
     )
 
 

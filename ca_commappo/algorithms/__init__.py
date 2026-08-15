@@ -5,7 +5,7 @@ All classes here are *runtime-registered* into XuanCe's torch registries (see
 This keeps ``.venv`` untouched, mirroring ``ca_commappo/xuance_compat.py``.
 """
 
-from ca_commappo.algorithms.representations import PermutationInvariantAttention
 from ca_commappo.algorithms.registration import register_components
+from ca_commappo.algorithms.representations import PermutationInvariantAttention
 
 __all__ = ["PermutationInvariantAttention", "register_components"]

@@ -29,9 +29,9 @@ import re
 import statistics
 import sys
 from argparse import Namespace
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping
 
 from ca_commappo.config import TRAINING_ENV_SEED_SCHEME, derive_training_env_seed
 from ca_commappo.evaluation.highway_metrics import summarize_episode_records
@@ -326,9 +326,10 @@ def _require_model_provenance(
         "random": "seeded_random",
         "idle_only": "fixed_policy",
     }.get(algorithm, "deterministic_argmax")
-    if not isinstance(evaluation_protocol, dict) or evaluation_protocol.get(
-        "action_selection_mode"
-    ) != expected_action_mode:
+    if (
+        not isinstance(evaluation_protocol, dict)
+        or evaluation_protocol.get("action_selection_mode") != expected_action_mode
+    ):
         raise AggregationError(
             f"algorithm={algorithm!r} requires action_selection_mode="
             f"{expected_action_mode!r} in {path}"
@@ -427,9 +428,10 @@ def _require_model_provenance(
             raise AggregationError(
                 f"model_provenance.{field} must be non-negative in {path}"
             )
-    if not isinstance(provenance.get("source_run_id"), str) or not provenance[
-        "source_run_id"
-    ]:
+    if (
+        not isinstance(provenance.get("source_run_id"), str)
+        or not provenance["source_run_id"]
+    ):
         raise AggregationError(
             f"model_provenance.source_run_id must be non-empty in {path}"
         )
@@ -438,9 +440,10 @@ def _require_model_provenance(
             f"model_provenance.selection_summary must be an object in {path}"
         )
     selection_protocol = provenance.get("selection_protocol")
-    if not isinstance(selection_protocol, dict) or selection_protocol.get(
-        "purpose"
-    ) != "checkpoint_selection":
+    if (
+        not isinstance(selection_protocol, dict)
+        or selection_protocol.get("purpose") != "checkpoint_selection"
+    ):
         raise AggregationError(
             f"model_provenance lacks checkpoint-selection protocol in {path}"
         )
@@ -467,7 +470,9 @@ def _validate_episode_payload(
     observed_scores = []
     for index, episode_record in enumerate(episode_records):
         if not isinstance(episode_record, dict):
-            raise AggregationError(f"episode payload {index} must be an object in {path}")
+            raise AggregationError(
+                f"episode payload {index} must be an object in {path}"
+            )
         if episode_record.get("episode_index") != index:
             raise AggregationError(
                 f"episode payload indices must be contiguous in {path}; "
@@ -779,7 +784,10 @@ def aggregate(
 
             checkpoint_key = (result.algorithm, result.checkpoint_sha256)
             previous_checkpoint = learned_checkpoint_owners.get(checkpoint_key)
-            if previous_checkpoint is not None and previous_checkpoint.seed != result.seed:
+            if (
+                previous_checkpoint is not None
+                and previous_checkpoint.seed != result.seed
+            ):
                 raise AggregationError(
                     f"same checkpoint reused for multiple training seeds in "
                     f"algorithm={result.algorithm!r}: {previous_checkpoint.path} and "
@@ -847,8 +855,10 @@ def load_runs_manifest(path: str | Path) -> tuple[list[str], dict[str, list[int]
         )
     artifacts = manifest.get("eval_records")
     expected = manifest.get("expected_seeds")
-    if not isinstance(artifacts, list) or not artifacts or not all(
-        isinstance(item, str) and item for item in artifacts
+    if (
+        not isinstance(artifacts, list)
+        or not artifacts
+        or not all(isinstance(item, str) and item for item in artifacts)
     ):
         raise AggregationError(
             f"runs manifest eval_records must be a non-empty string list: {manifest_path}"
@@ -904,8 +914,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         metavar="SEED",
         help=(
-            "exact training seed set required for every algorithm "
-            "(for example: 1 2 3)"
+            "exact training seed set required for every algorithm (for example: 1 2 3)"
         ),
     )
     parser.add_argument("--output", default=None, help="output CSV path")

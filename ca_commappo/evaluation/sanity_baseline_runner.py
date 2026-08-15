@@ -7,16 +7,15 @@ import numpy as np
 import yaml
 from gymnasium import spaces
 
-from ca_commappo.evaluation.highway_metrics import (
-    build_episode_record,
-    summarize_episode_records,
-)
 from ca_commappo.envs.highway_intersection_wrapper import (
     DEFAULT_HIGHWAY_ENV_ID,
     IDLE_ACTION,
     HighwayIntersectionMultiAgentEnv,
 )
-
+from ca_commappo.evaluation.highway_metrics import (
+    build_episode_record,
+    summarize_episode_records,
+)
 
 SUPPORTED_POLICIES = ("random", "idle-only")
 
@@ -307,9 +306,7 @@ def _load_highway_config(
     return _deep_merge(referenced_config, inline_config)
 
 
-def _deep_merge(
-    base: dict[str, Any], overrides: dict[str, Any]
-) -> dict[str, Any]:
+def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     merged = dict(base)
     for key, value in overrides.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):

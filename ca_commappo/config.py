@@ -4,7 +4,6 @@ from typing import Any
 
 from xuance.common import load_yaml, recursive_dict_update
 
-
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 COMMON_CONFIG_PATH = CONFIG_DIR / "common.yaml"
 TRAINING_ENV_SEED_STRIDE = 1_000_000
@@ -32,7 +31,7 @@ def derive_training_env_seed(training_seed: int) -> int:
     """Map one training seed to a disjoint vector-environment seed block."""
 
     if isinstance(training_seed, bool) or not isinstance(training_seed, int):
-        raise ValueError("training seed must be an integer")
+        raise TypeError("training seed must be an integer")
     if training_seed < 0:
         raise ValueError("training seed must be non-negative")
     return training_seed * TRAINING_ENV_SEED_STRIDE

@@ -3,7 +3,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_OUTPUT_DIR = Path("runs/mappo_highway")
 
 

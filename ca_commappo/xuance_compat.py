@@ -101,9 +101,7 @@ def _patch_feedforward_mappo_value_norm(learner_class: type) -> None:
         normalizers = self.value_normalizer
         original_normalizers = dict(normalizers)
         masked_normalizers = {
-            key: _MaskedValueNormalizer(
-                normalizer, masks_by_model[key]
-            )
+            key: _MaskedValueNormalizer(normalizer, masks_by_model[key])
             for key, normalizer in original_normalizers.items()
         }
         normalizers.update(masked_normalizers)
@@ -127,9 +125,9 @@ def _feedforward_masks_by_model(learner: Any, sample: dict) -> dict[str, np.ndar
     masks_by_model = {}
     for index, model_key in enumerate(learner.model_keys):
         agent_key = model_key if model_key in agent_masks else learner.agent_keys[index]
-        masks_by_model[model_key] = np.asarray(agent_masks[agent_key]).reshape(
-            -1
-        ).astype(bool)
+        masks_by_model[model_key] = (
+            np.asarray(agent_masks[agent_key]).reshape(-1).astype(bool)
+        )
     return masks_by_model
 
 

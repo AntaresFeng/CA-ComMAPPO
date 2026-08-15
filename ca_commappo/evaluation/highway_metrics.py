@@ -1,6 +1,7 @@
 import json
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 
 def episode_outcome(

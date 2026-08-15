@@ -11,8 +11,6 @@ Call ``register_components()`` from ``train_highway_intersection.run()`` before
 
 from __future__ import annotations
 
-from typing import Dict, Type
-
 from xuance.torch import Module
 from xuance.torch.representations import REGISTRY_Representation
 
@@ -20,7 +18,7 @@ from xuance.torch.representations import REGISTRY_Representation
 # module import time; they are only needed when registration actually runs.
 
 
-def _register(registry: Dict[str, Type[Module]], key: str, cls: Type[Module]) -> None:
+def _register(registry: dict[str, type[Module]], key: str, cls: type[Module]) -> None:
     """Register ``cls`` under ``key`` unless already registered (idempotent)."""
     if registry.get(key) is cls:
         return
