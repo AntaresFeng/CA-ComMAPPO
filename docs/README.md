@@ -12,6 +12,7 @@
 | [`ca_commappo_design.md`](ca_commappo_design.md) | CA-ComMAPPO 数学定义、实现映射和当前设计债务 | 修改创新算法前 |
 | [`sanity_baselines.md`](sanity_baselines.md) | random / idle-only 的正式评估协议 | 验证环境或生成静态基线时 |
 | [`experiments_runbook.md`](experiments_runbook.md) | smoke、正式训练、final test、视频和聚合的可执行流程 | 启动或归档实验时 |
+| [`four_vehicle_experiment_plan.md`](four_vehicle_experiment_plan.md) | 当前四车论文实验的分阶段执行与冻结顺序 | 接续实现、训练或审计阶段进度时 |
 | [`thesis-planning.md`](thesis-planning.md) | 研究问题、算法矩阵、消融和剩余论文证据 | 安排后续实现与实验时 |
 
 ## 权威顺序
