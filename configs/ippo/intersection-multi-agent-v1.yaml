@@ -2,7 +2,7 @@ agent: "IPPO"
 learner: "IPPO_Learner"
 policy: "Categorical_MAAC_Policy"
 representation: "Basic_MLP"
-vectorize: "DummyVecMultiAgentEnv"
+vectorize: "SubprocVecMultiAgentEnv"
 use_rnn: false
 use_global_state: false
 output_dir: "runs/ippo_highway/"

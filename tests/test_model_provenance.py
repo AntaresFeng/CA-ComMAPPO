@@ -2,8 +2,14 @@ import json
 from argparse import Namespace
 
 import pytest
+from xuance.environment import make_envs
 
-from ca_commappo.config import TRAINING_ENV_SEED_SCHEME, derive_training_env_seed
+from ca_commappo.config import (
+    TRAINING_ENV_SEED_SCHEME,
+    derive_training_env_seed,
+    load_configs,
+)
+from ca_commappo.envs.highway_intersection_wrapper import DEFAULT_HIGHWAY_ENV_ID
 from ca_commappo.evaluation import model_provenance
 from ca_commappo.evaluation.model_provenance import (
     BEST_MODEL_PROVENANCE_FILENAME,
@@ -214,6 +220,36 @@ def test_write_rejects_invalid_training_environment_seed_mapping(tmp_path):
             selection_summary={"episodes": 50},
             selection_protocol=_selection_protocol(),
         )
+
+
+def test_ippo_formal_env_construction_preserves_provenance_seed(tmp_path):
+    configs = load_configs(
+        DEFAULT_HIGHWAY_ENV_ID,
+        config_path="configs/ippo/intersection-multi-agent-v1.yaml",
+        overrides={"seed": 1, "parallels": 2},
+    )
+    configs.model_dir = str(tmp_path / "models")
+    expected_env_seed = derive_training_env_seed(configs.seed)
+
+    assert configs.smoke is False
+    assert configs.vectorize == "SubprocVecMultiAgentEnv"
+    envs = make_envs(configs)
+    try:
+        assert configs.env_seed == expected_env_seed
+    finally:
+        envs.close()
+
+    payload = write_best_model_provenance(
+        model_path=_write_checkpoint(tmp_path),
+        configs=configs,
+        selected_epoch=0,
+        selected_step=0,
+        selection_summary={"episodes": 50, "arrival_rate": 0.0},
+        selection_protocol=_selection_protocol(),
+    )
+
+    assert payload["training_env_seed"] == expected_env_seed
+    assert payload["training_config"]["vectorize"] == "SubprocVecMultiAgentEnv"
 
 
 def test_load_rejects_training_seed_mismatch(tmp_path):

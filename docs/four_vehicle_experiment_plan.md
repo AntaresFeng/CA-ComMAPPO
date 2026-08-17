@@ -77,6 +77,14 @@ no-prior、IPPO、CommNet 和 IC3Net。所有算法必须通过真实 action/upd
 
 随后扩展：IPPO、CommNet、IC3Net，各运行 seeds 1/2/3。
 
+核心矩阵已在冻结提交 `199ead5d8b2fababa649d3aa94c1c025eb08d682` 完成：MAPPO、
+Attention-MAPPO、CA-ComMAPPO full 和 no-prior 各有 seeds 1/2/3 的正式 benchmark、
+100-case final test 与 6-case 视频。IPPO 的首个正式 run 暴露了 XuanCe
+`DummyVecMultiAgentEnv` 会原地改变共享 `env_seed` 的问题，因此该失败 run 不属于正式
+结果。IPPO 改用 `SubprocVecMultiAgentEnv` 后，与 CommNet、IC3Net 一起在后续修复提交上
+作为扩展矩阵重新运行，并使用独立 manifest；论文主结论只使用 `199ead5` 的核心矩阵，
+不得把两个提交的学习算法混入同一严格聚合。
+
 每个 benchmark 完成后立即用 best checkpoint 执行固定 100-case final test，并录制
 seeds `20000..20005` 的 6 个视频。逐 run 审计 checkpoint/sidecar SHA、配置和 runtime
 合同、日志异常、视频可播放性；CA 额外检查 lambda 非负且梯度有限。
@@ -85,6 +93,8 @@ seeds `20000..20005` 的 6 个视频。逐 run 审计 checkpoint/sidecar SHA、�
 
 - 在冻结提交上完成顺序扰动与 attention/TTC 导出。
 - 每个算法建立显式 seeds 1/2/3 manifest，通过严格聚合器后生成审定 CSV。
+- 核心四算法与后续修复提交上的扩展三算法分别建立 manifest；扩展结果在论文中明确
+  标注来源提交，只作补充比较，不进入核心主结论。
 - `runs/` 始终保持 Git 忽略；只将人工审定的 manifest、聚合表和小型 provenance
   摘要写入 `results/`。
 - 每完成一个实现、实验或文档阶段创建聚焦 Conventional Commit。
