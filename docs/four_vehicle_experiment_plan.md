@@ -2,13 +2,13 @@
 
 ## 目标与当前定位
 
-本计划接续历史交接文档中未完成的实验阶段，并以当前仓库、canonical YAML 和
-`docs/` 根目录文档为准。论文主线固定为四个 controlled vehicles，不开展
-4→6/8/10 车辆泛化，也不据此声明规模泛化能力。
+本计划记录四车论文实验从质量门禁到最终归档的执行顺序和完成状态，并以当前仓库、
+canonical YAML 和 `docs/` 根目录文档为准。论文主线固定为四个 controlled vehicles，
+不开展 4→6/8/10 车辆泛化，也不据此声明规模泛化能力。
 
-现有历史 MAPPO I5 seed 1 与 CA-ComMAPPO seed 1 benchmark/final/video 保留为预实验
-参考。后续评估工具和 provenance 合同完成后，所有论文正式结果都必须在同一个最终
-源码提交上使用训练 seeds `[1, 2, 3]` 重新生成。
+历史 MAPPO I5 seed 1 与早期 CA-ComMAPPO seed 1 仅保留为预实验参考。核心正式结果
+已在提交 `199ead5` 上按训练 seeds `[1, 2, 3]` 重新生成；IPPO 修复后形成独立的
+`d50ed20` 扩展矩阵，两者按 provenance 规则分别聚合。
 
 ## 阶段一：质量门禁与 provenance v2
 
@@ -47,11 +47,11 @@
 - 固定 case 的配对统计只作辅助，不替代训练 seed 方差。
 - 生成主结果表、顺序扰动图、消融图和解释性图。
 
-已实现 `main.py paper-analysis`：它复用严格 final-test 聚合门禁，默认要求核心三组
+`main.py paper-analysis` 复用严格 final-test 聚合门禁，默认要求核心三组
 配对齐全，输出逐 seed 原始值、sample std、方向明确的配对效应量与精确双侧 sign-flip
 检验。三个 seed 的 p 值仅作探索性辅助。主结果、配对消融与顺序扰动图输出 PNG/PDF；
-CA trace 工具生成的 attention/TTC heatmap 构成解释性图。正式 artifact 尚待最终冻结
-提交上的多 seed 训练完成后生成。
+CA trace 工具生成的 attention/TTC heatmap 构成解释性图。正式输出已归档到
+`results/core_matrix_199ead5_paper_analysis/` 和 `results/core_matrix_199ead5_ca_trace/`。
 
 ## 阶段三：全算法 smoke 与源码冻结
 
@@ -65,8 +65,10 @@ no-prior、IPPO、CommNet 和 IC3Net。所有算法必须通过真实 action/upd
 
 ## 阶段四：正式多 seed 实验
 
-正式任务统一设置 `WANDB_MODE=offline`，使用 `--mode benchmark` 和独立具名 tmux。
-本机 20 核、31 GiB，长任务一次只运行一个，避免 CPU/内存竞争。
+正式任务统一设置 `WANDB_MODE=offline`，使用 `--mode benchmark`。长任务先固化为
+`runs/launch_scripts/` 脚本，再通过独立具名 tmux session 启动；本机一次只运行一个
+长任务。既有正式矩阵使用 CPU，2026-10-10 重启后 CUDA 已通过真实 action/update
+smoke，后续新任务可在同一比较矩阵统一使用 `--device cuda:0`。
 
 核心矩阵优先：
 
@@ -96,12 +98,9 @@ CSV；核心矩阵已完成 MAPPO、Attention-MAPPO、辅助 CA-ComMAPPO 的正�
 full/no-prior 的 attention/TTC trace，以及包含三组预注册配对的 `paper-analysis`。
 审定表、图、trace 摘要和结论报告均已归档到 `results/`，当前没有运行中的实验。
 
-- 在冻结提交上完成顺序扰动与 attention/TTC 导出。
-- 每个算法建立显式 seeds 1/2/3 manifest，通过严格聚合器后生成审定 CSV。
-- 核心四算法与后续修复提交上的扩展三算法分别建立 manifest；扩展结果在论文中明确
-  标注来源提交，只作补充比较，不进入核心主结论。
-- `runs/` 始终保持 Git 忽略；只将人工审定的 manifest、聚合表和小型 provenance
-  摘要写入 `results/`。
-- 每完成一个实现、实验或文档阶段创建聚焦 Conventional Commit。
-- 最终更新论文实验结果文档，记录 YAML、完整命令、Git commit、seed、设备、artifact
-  路径、偏离协议之处、结果表和图。
+- 顺序扰动、attention/TTC 导出、核心配对统计和绘图均在匹配冻结提交的严格环境完成。
+- 每个矩阵已有显式 seeds 1/2/3 manifest 和严格聚合 CSV。
+- 核心四算法与扩展三算法保持独立 manifest；扩展结果只作补充比较。
+- `runs/` 保留 Git 忽略的原始大 artifact；`results/` 保存审定 manifest、表、图和小型
+  provenance 摘要。
+- 实现、实验、聚合、分析和文档阶段均形成了聚焦 Conventional Commit。

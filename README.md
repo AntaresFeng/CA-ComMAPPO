@@ -21,7 +21,8 @@ WANDB_MODE=offline uv run python main.py mappo \
 uv run pytest -q
 ```
 
-正式训练必须使用 `WANDB_MODE=offline`、`--mode benchmark` 和独立 tmux session。
+正式训练必须使用 `WANDB_MODE=offline`、`--mode benchmark`，先固化启动脚本，再通过
+独立具名 tmux session 运行；CUDA 可用时显式传 `--device cuda:0`。
 不要把 smoke 或 benchmark checkpoint-selection summary 当作论文最终结果。
 
 ## 配置结构
@@ -43,6 +44,7 @@ Iteration 5，当前固定为 4 个受控车辆、5 Hz、1M steps、`gamma=0.99`
 
 从 [文档导航](docs/README.md) 开始：
 
+- [当前实验全景](docs/current_experiment_status.md)
 - [环境合同](docs/environment.md)
 - [Canonical MAPPO baseline](docs/mappo_baseline.md)
 - [CA-ComMAPPO 设计](docs/ca_commappo_design.md)

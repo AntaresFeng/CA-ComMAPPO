@@ -43,7 +43,9 @@ collision `0.36`，弱于本基线的 `0.38/0.01`，因此已回退且不属于�
 contract SHA-256：
 `d942c76c83d9a8b58a3100fbf3034182f4b25b3ec705ccd7241c00ca4256d699`。
 
-当前只有 seed 1，尚不满足三 seed 的最终论文验收条件；后续算法对比必须使用相同任务
+本节保留 seed 1 的 canonical 基线来源与历史 provenance。当前核心矩阵已在冻结提交
+`199ead5` 上完成 seeds `[1,2,3]` 的正式 benchmark/final/video；三 seed 结果见
+`results/core_matrix_199ead5_final_test_results.md`，后续算法对比仍必须使用相同任务
 配置、预算、训练 seed block 和固定选择/final 协议。
 
 机器可读证据集中在：
@@ -54,25 +56,24 @@ contract SHA-256：
 
 ## 复现命令
 
-正式训练必须在独立 tmux 中运行 benchmark，并保持 W&B 离线：
+精确复现历史 CPU artifact 时使用 `--device cpu`。长任务必须按
+[`experiments_runbook.md`](experiments_runbook.md) 先写入启动脚本，再通过独立具名 tmux
+session 执行；核心命令为：
 
 ```bash
-tmux new-session -d -s mappo-baseline-seed1 -c /home/fzx/CA-ComMAPPO \
-  'env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache \
-   MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 \
-   uv run python main.py mappo \
-   --config configs/mappo/intersection-multi-agent-v1.yaml \
-   --mode benchmark --seed 1'
+uv run python main.py mappo \
+  --config configs/mappo/intersection-multi-agent-v1.yaml \
+  --mode benchmark --seed 1 --device cpu
 ```
 
-最终结果只取 best model 的独立 100 局验证：
+最终结果只取 best model 的独立 100 局验证；该长验证同样通过脚本和 tmux 启动：
 
 ```bash
 WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache \
 MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache \
 uv run python main.py mappo \
   --config configs/mappo/intersection-multi-agent-v1.yaml \
-  --mode test --seed 1 \
+  --mode test --seed 1 --device cpu \
   --model-dir-load runs/mappo_highway/<benchmark-run>/models/best_model.pth \
   --test-episode 100 --record-video --video-episodes 6
 ```

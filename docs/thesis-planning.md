@@ -2,7 +2,8 @@
 
 本文只回答“论文要比较什么、验证什么、还缺什么”。固定 MAPPO 任务合同见
 [`mappo_baseline.md`](mappo_baseline.md)，执行方式见
-[`experiments_runbook.md`](experiments_runbook.md)。
+[`experiments_runbook.md`](experiments_runbook.md)，当前实验全景和 artifact 入口见
+[`current_experiment_status.md`](current_experiment_status.md)。
 
 ## 研究问题
 

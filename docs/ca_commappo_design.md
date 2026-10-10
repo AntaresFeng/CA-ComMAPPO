@@ -1,6 +1,6 @@
 # CA-ComMAPPO 算法设计
 
-本文只定义 CA-ComMAPPO 的算法语义、当前代码映射和已知设计债务。共享任务与训练
+本文只定义 CA-ComMAPPO 的算法语义、当前代码映射和已知边界。共享任务与训练
 超参由 [`mappo_baseline.md`](mappo_baseline.md) 冻结，实验操作见
 [`experiments_runbook.md`](experiments_runbook.md)。
 
@@ -93,23 +93,22 @@ evaluator 另外记录动作、normalized ego 轨迹、reward 和结局，并只
 - 完整方法、no-prior、Attention-MAPPO 和 MAPPO 必须复用同一环境、训练预算、seed
   block 与 final-test protocol。
 
-## 正式训练前的设计债务
+## 已知边界
 
-以下问题尚未解决，不能把当前 CA-ComMAPPO 结果作为最终论文证据：
-
-1. 车辆数量变化会同时改变 agent identity 和 critic 输入形状；在完成 checkpoint
-   兼容方案前，不得宣称模型可直接从 4 辆泛化到 6/8/10 辆。
-
-修复这些问题属于算法变更，必须单独提交、通过完整测试和 smoke，再启动 CA-ComMAPPO
-正式训练。不得用文档改写来掩盖实现差异。
+车辆数量变化会同时改变 agent identity 和 critic 输入形状；当前 checkpoint 没有
+4→6/8/10 辆的兼容协议。因此正式结果只支持冻结的四车任务，不支持规模泛化声明。
+规模泛化已明确排除在本论文实验范围外，所以它不是现有四车正式结果的阻断项；若未来
+重新纳入，属于算法与实验合同变更，必须使用新提交、新 checkpoint 和新对照矩阵。
 
 ## 论文可支持的声明
 
-只有相应实验完成后才能使用以下结论：
+当前正式证据支持以下有限结论；数值和统计边界见
+`results/core_matrix_199ead5_analysis_report.md`：
 
-- 顺序扰动实验支持 PI encoder 的排列稳定性。
-- Attention-MAPPO 对比 MAPPO 隔离 encoder 贡献。
-- full 对比 no-prior 隔离冲突先验贡献。
+- 顺序扰动实验直接支持 PI encoder 的排列稳定性。
+- Attention-MAPPO 对比 MAPPO 支持 encoder 结构贡献。
+- full 对比 no-prior 给出冲突先验的方向一致正效应，但仅有三个训练 seed。
+- full 相对 Attention-MAPPO 没有形成“显式通信全面更优”的明确证据。
 - full 对比 CommNet / IC3Net 只能作为系统级通信基线比较；其 RNN backbone 不同，
   不能单独归因于聚合方式。
 - attention heatmap 只提供可解释性案例，不能替代成功率、安全性和显著性检验。

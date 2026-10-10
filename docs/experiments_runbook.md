@@ -1,8 +1,8 @@
 # 实验执行手册
 
 本文只描述当前代码已经支持的可复现实验流程。任务与 MAPPO 超参以
-[`mappo_baseline.md`](mappo_baseline.md) 为准；研究矩阵和尚未实现的实验见
-[`thesis-planning.md`](thesis-planning.md)。
+[`mappo_baseline.md`](mappo_baseline.md) 为准；当前矩阵、证据状态和结果入口见
+[`current_experiment_status.md`](current_experiment_status.md)。
 
 ## 不可变规则
 
@@ -50,11 +50,11 @@ export PYTHONUNBUFFERED=1
 | Attention-MAPPO | `configs/attention_mappo/intersection-multi-agent-v1.yaml` | PI social encoder |
 | CommNet | `configs/commnet/intersection-multi-agent-v1.yaml` | 平均通信、RNN backbone |
 | IC3Net | `configs/ic3net/intersection-multi-agent-v1.yaml` | 门控通信、RNN backbone |
-| CA-ComMAPPO | `configs/ca_commappo/intersection-multi-agent-v1.yaml` | 完整方法；当前有设计债务 |
+| CA-ComMAPPO | `configs/ca_commappo/intersection-multi-agent-v1.yaml` | 完整方法；正式结果限于四车合同 |
 | CA-ComMAPPO no-prior | `configs/ca_commappo/intersection-multi-agent-v1-no-prior.yaml` | `b_ij=0` 消融 |
 
-CA-ComMAPPO 正式训练前必须先处理其设计文档列出的阻断项。CommNet / IC3Net 的
-backbone 与 CA-ComMAPPO 不同，比较时不得把全部差异归因于通信聚合。
+CommNet / IC3Net 的 backbone 与 CA-ComMAPPO 不同，比较时不得把全部差异归因于通信
+聚合。CA-ComMAPPO 的规模泛化边界不影响当前四车合同，但禁止外推到其他车辆数。
 
 ## 1. Smoke 门禁
 
