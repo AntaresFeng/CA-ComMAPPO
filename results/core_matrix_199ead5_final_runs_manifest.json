@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "eval_records": [
+    "runs/mappo_highway/20260816_011800_070557_test_seed_1/eval_records.jsonl",
+    "runs/mappo_highway/20260816_143054_207489_test_seed_2/eval_records.jsonl",
+    "runs/mappo_highway/20260816_155856_740519_test_seed_3/eval_records.jsonl",
+    "runs/attention_mappo_highway/20260816_174629_193484_test_seed_1/eval_records.jsonl",
+    "runs/attention_mappo_highway/20260816_193401_647822_test_seed_2/eval_records.jsonl",
+    "runs/attention_mappo_highway/20260816_212134_159876_test_seed_3/eval_records.jsonl",
+    "runs/ca_commappo_highway/20260816_231036_701312_test_seed_1/eval_records.jsonl",
+    "runs/ca_commappo_highway/20260817_005939_237023_test_seed_2/eval_records.jsonl",
+    "runs/ca_commappo_highway/20260817_024841_685156_test_seed_3/eval_records.jsonl",
+    "runs/ca_commappo_no_prior_highway/20260817_043744_129516_test_seed_1/eval_records.jsonl",
+    "runs/ca_commappo_no_prior_highway/20260817_062646_653418_test_seed_2/eval_records.jsonl",
+    "runs/ca_commappo_no_prior_highway/20260817_081549_072925_test_seed_3/eval_records.jsonl",
+    "runs/random_highway/20260810_220643_345839_test_seed_1/eval_records.jsonl",
+    "runs/idle_only_highway/20260810_220643_345839_test_seed_1/eval_records.jsonl"
+  ],
+  "expected_seeds": {
+    "mappo": [1, 2, 3],
+    "attention_mappo": [1, 2, 3],
+    "ca_commappo": [1, 2, 3],
+    "ca_commappo_no_prior": [1, 2, 3],
+    "random": [1],
+    "idle_only": [1]
+  }
+}

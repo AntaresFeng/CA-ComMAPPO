@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "eval_records": [
+    "runs/ippo_highway/20260817_233925_097773_test_seed_1/eval_records.jsonl",
+    "runs/ippo_highway/20260818_010657_468452_test_seed_2/eval_records.jsonl",
+    "runs/ippo_highway/20260818_023459_863420_test_seed_3/eval_records.jsonl",
+    "runs/commnet_highway/20260819_222225_532667_test_seed_1/eval_records.jsonl",
+    "runs/commnet_highway/20260820_001757_878848_test_seed_2/eval_records.jsonl",
+    "runs/commnet_highway/20260820_021330_332839_test_seed_3/eval_records.jsonl",
+    "runs/ic3net_highway/20260820_040102_779672_test_seed_1/eval_records.jsonl",
+    "runs/ic3net_highway/20260820_055135_409770_test_seed_2/eval_records.jsonl",
+    "runs/ic3net_highway/20260820_072937_962292_test_seed_3/eval_records.jsonl"
+  ],
+  "expected_seeds": {
+    "ippo": [1, 2, 3],
+    "commnet": [1, 2, 3],
+    "ic3net": [1, 2, 3]
+  }
+}
