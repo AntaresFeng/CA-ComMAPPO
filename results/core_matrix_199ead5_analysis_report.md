@@ -54,8 +54,9 @@ SHA-256，因此仍可检查原始记录是否发生变化。
 ## 执行与边界
 
 - order-eval 与 ca-trace 均从冻结提交 `199ead5` 的干净隔离 checkout 执行，设备为 CPU。
-  RTX 3080 可被 `nvidia-smi` 识别，但当前 PyTorch CUDA 初始化报 `CUDA unknown error`，
-  因而未强制使用不可用的 CUDA 上下文。
+  执行当时 PyTorch CUDA 初始化报 `CUDA unknown error`，因而未强制使用不可用的 CUDA
+  上下文。主机重启后，RTX 3080 已于 2026-10-10 通过 PyTorch 张量探测和 CA-ComMAPPO
+  真实 action/update smoke；这不改变既有 CPU artifact 的 provenance，也不触发重跑。
 - 后台 CA 队列通过 `runs/launch_scripts/run_posthoc_analysis_199ead5.sh` 在 tmux session
   `paper-posthoc-199ead5` 中串行执行，event log 以
   `QUEUE COMPLETE all posthoc artifacts passed` 收尾。

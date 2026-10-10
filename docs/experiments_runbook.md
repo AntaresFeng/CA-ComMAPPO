@@ -29,6 +29,18 @@ export MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache
 export PYTHONUNBUFFERED=1
 ```
 
+## 设备与长任务启动
+
+- 当前主机的 RTX 3080 已于 2026-10-10 通过 CA-ComMAPPO 真实 action/update CUDA smoke；
+  后续新训练或长验证在 `torch.cuda.is_available()` 为真时显式传 `--device cuda:0`。
+- `device` 不属于 checkpoint 训练合同哈希，但 provenance 会单独记录训练设备。同一严格
+  manifest 中的学习算法必须保持相同训练设备；不得把 CPU/GPU 混合训练结果并入同一
+  正式比较。
+- 已完成的 `199ead5` 核心矩阵和 `d50ed20` 扩展矩阵均为 CPU 正式结果，不因 CUDA
+  恢复而重跑或改写。
+- 长时间训练和验证先固化为 `runs/launch_scripts/<task>.sh`，脚本设置环境变量、完整
+  命令、日志和退出状态；再由独立具名 tmux session 后台启动。短 smoke 可以前台执行。
+
 ## 配置矩阵
 
 | 论文名称 | 配置 | 说明 |
@@ -74,16 +86,31 @@ smoke 只验证管线，不是正式结果，不进入论文 manifest。
 ## 2. 正式 benchmark
 
 论文最低训练 seed 集为 `[1,2,3]`；若预算允许扩展到 5 个，必须预先声明并对所有
-学习算法使用同一集合。单 seed 的 tmux 模板：
+学习算法使用同一集合。单 seed 先创建 `runs/launch_scripts/<algo>-seed1.sh`：
 
 ```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+cd /home/fzx/CA-ComMAPPO
+export WANDB_MODE=offline
+export UV_CACHE_DIR=/tmp/ca-commappo-uv-cache
+export MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache
+export PYTHONUNBUFFERED=1
+
+set -o pipefail
+uv run python main.py mappo \
+  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --mode benchmark --seed 1 --device cuda:0 \
+  2>&1 | tee runs/launch_logs/<algo>-seed1.log
+```
+
+检查脚本后再启动后台 session：
+
+```bash
+bash -n runs/launch_scripts/<algo>-seed1.sh
 tmux new-session -d -s <algo>-seed1 -c /home/fzx/CA-ComMAPPO \
-  'env WANDB_MODE=offline UV_CACHE_DIR=/tmp/ca-commappo-uv-cache \
-   MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache PYTHONUNBUFFERED=1 \
-   uv run python main.py mappo \
-   --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
-   --mode benchmark --seed 1 \
-   2>&1 | tee runs/launch_logs/<algo>-seed1.log'
+  'bash runs/launch_scripts/<algo>-seed1.sh'
 ```
 
 benchmark 每 10k steps 在固定 50 cases 上确定性评估，以
