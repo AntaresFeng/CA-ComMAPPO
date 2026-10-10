@@ -80,6 +80,6 @@ benchmark run（best checkpoint 来源）：
 - 以上均为 **正式 final test**（100 episodes，seeds `20000..20099`，deterministic argmax）结果，落盘文件：`<test_run>/eval_records.jsonl`。
 - 每个 test 已包含 6 个视频，路径见对应 `videos/` 目录。
 - “agent arr frac / agent coll frac” 为 `mean_agent_arrival_fraction` / `mean_agent_collision_fraction`。
-- 聚合标准差为三 seed 的 **sample std**；三 seed 情况下仅作描述性参考，正式统计请以阶段五的 `paper-analysis`（含配对差与 sign-flip 检验）为准。
+- 聚合标准差为三 seed 的 **sample std**；正式配对统计、顺序扰动结果和解释边界见 `results/core_matrix_199ead5_analysis_report.md`，机器可读表与图见 `results/core_matrix_199ead5_paper_analysis/`。
 - 核心矩阵只来自提交 `199ead5`；IPPO/CommNet/IC3Net 属于后续扩展（另一提交 `d50ed20`），不在本表。
 

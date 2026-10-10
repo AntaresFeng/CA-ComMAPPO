@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source_commit": "199ead5d8b2fababa649d3aa94c1c025eb08d682",
+  "runtime_source_sha256": "191e071d2966410511a97794eacd33025db3582b164c4235734d6c98365ff52a",
+  "protocol": {
+    "training_seed": 1,
+    "episode_seeds": [20000, 20001, 20002, 20003, 20004, 20005, 20006, 20007, 20008, 20009],
+    "action_selection_mode": "deterministic_argmax",
+    "role": "interpretability_evidence_not_multi_seed_performance"
+  },
+  "runs": {
+    "full": {
+      "run_dir": "runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1",
+      "checkpoint_sha256": "5bca44a6b56e486ac2e0ff1c80cea737962499f3e06263723009985e18481f5f",
+      "raw_records_sha256": "be58f32f9d2500b5a57ef8a4771ab343dc669d91a57baa99cfc57d787ff05c93",
+      "archived_metadata": "results/core_matrix_199ead5_ca_trace/full/ca_trace_metadata.json",
+      "archived_summary": "results/core_matrix_199ead5_ca_trace/full/ca_trace_summary.json",
+      "archived_overall_heatmap_png": "results/core_matrix_199ead5_ca_trace/full/attention_all_cases.png",
+      "archived_overall_heatmap_pdf": "results/core_matrix_199ead5_ca_trace/full/attention_all_cases.pdf"
+    },
+    "no_prior": {
+      "run_dir": "runs/ca_commappo_no_prior_highway/20261010_173237_329004_ca-trace_seed_1",
+      "checkpoint_sha256": "3ef2e8185062fa31869c3d2053e3a1ea4e50c8b1925533e02f9fdc382c263282",
+      "raw_records_sha256": "8d19e6a42c42af61c998bb620efddb7875e4a5d6b6ed01d2709265b4eb26a89e",
+      "archived_metadata": "results/core_matrix_199ead5_ca_trace/no_prior/ca_trace_metadata.json",
+      "archived_summary": "results/core_matrix_199ead5_ca_trace/no_prior/ca_trace_summary.json",
+      "archived_overall_heatmap_png": "results/core_matrix_199ead5_ca_trace/no_prior/attention_all_cases.png",
+      "archived_overall_heatmap_pdf": "results/core_matrix_199ead5_ca_trace/no_prior/attention_all_cases.pdf"
+    }
+  }
+}

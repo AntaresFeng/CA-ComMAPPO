@@ -59,28 +59,28 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 | 核心矩阵：MAPPO、Attention-MAPPO、CA-ComMAPPO full/no-prior，seeds 1/2/3 | 已完成；冻结提交 `199ead5`，均含 benchmark、100-case final test 与 6-case 视频 |
 | 扩展矩阵：IPPO、CommNet、IC3Net，seeds 1/2/3 | 已完成；修复提交 `d50ed20`，均含 benchmark、100-case final test 与 6-case 视频 |
 | random / idle-only 同 case 正式结果 | 已完成 |
-| 顺序扰动 evaluator | 已实现，待最终 checkpoint 生成正式 artifact |
-| attention/TTC 导出和 heatmap | 已实现，待最终 checkpoint 生成正式 artifact |
-| 多 seed 配对统计与论文绘图工具 | 已实现，待核心 manifest、顺序扰动 artifact 与正式 `paper-analysis` 输出 |
-| 最终统计结果审定与论文归档 | 未完成 |
+| 顺序扰动 evaluator | 已完成正式 artifact：MAPPO、Attention-MAPPO、辅助 CA-ComMAPPO，seed 1、100 cases、3 组置换 |
+| attention/TTC 导出和 heatmap | 已完成正式 artifact：full/no-prior，seed 1、10 cases |
+| 多 seed 配对统计与论文绘图工具 | 已完成核心 `paper-analysis` 输出和三组预注册配对 |
+| 最终统计结果审定与论文归档 | 核心与扩展矩阵已分别归档；论文文字撰写仍待完成 |
 
 核心矩阵与扩展矩阵来自不同冻结提交，必须分别聚合。扩展矩阵只作补充描述性比较，
 不能与核心矩阵放入同一个严格 manifest 或配对检验。provenance v1 历史结果仍只作
 预实验参考，不进入新的正式聚合。
 
-## 实施顺序
+## 后续论文工作
 
-1. 为核心矩阵与扩展矩阵分别建立显式 manifest，并通过严格聚合器复核。
-2. 在核心冻结提交 `199ead5` 上生成 MAPPO、Attention-MAPPO 的顺序扰动 artifact，
-   以及 CA-ComMAPPO full/no-prior 的 attention/TTC trace。
-3. 对核心矩阵运行 `paper-analysis`，完成配对统计、图表和最终结果文档；扩展矩阵只
-   保留独立聚合与补充说明。
+1. 将 `results/core_matrix_199ead5_analysis_report.md` 的效应量、逐 seed 数值和边界写入
+   论文实验章节，不把三 seed 的 sign-flip p 值作为主要结论。
+2. 使用已归档的主结果图、配对差图、顺序扰动图和 CA 总览 heatmap 排版论文图表。
+3. 明确报告 H3 未获支持，并把扩展矩阵标注为来自后续修复提交的补充比较。
 
 本论文固定四车任务，不开展 4→6/8/10 checkpoint 泛化实验，也不声明规模泛化能力。
 
 ## 论文边界
 
-- 研究假设尚未由多 seed 实验验证，文中应区分“设计目标”和“实证结论”。
+- H1/H2 获得支持，H4 获得方向一致但样本量有限的支持；H3 未获得明确支持。文中必须
+  区分预注册假设、效应量和可由当前三 seed 数据支持的实证结论。
 - 冲突先验是单中心 kinematic proxy，不包含真实路线优先级或所有背景车辆。
 - 理想通信不考虑延迟、丢包、带宽和隐私；这些属于后续工作。
 - MAAC 与 MADDPG 暂不进入主矩阵：前者关注 attention critic，后者不适合当前离散

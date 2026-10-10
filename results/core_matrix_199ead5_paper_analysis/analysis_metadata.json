@@ -1,0 +1,76 @@
+{
+  "comparisons": [
+    {
+      "name": "attention_mappo_minus_mappo",
+      "reference": "mappo",
+      "target": "attention_mappo"
+    },
+    {
+      "name": "ca_commappo_minus_attention_mappo",
+      "reference": "attention_mappo",
+      "target": "ca_commappo"
+    },
+    {
+      "name": "ca_commappo_minus_no_prior",
+      "reference": "ca_commappo_no_prior",
+      "target": "ca_commappo"
+    }
+  ],
+  "dispersion": "sample_standard_deviation",
+  "expected_seeds": {
+    "attention_mappo": [
+      1,
+      2,
+      3
+    ],
+    "ca_commappo": [
+      1,
+      2,
+      3
+    ],
+    "ca_commappo_no_prior": [
+      1,
+      2,
+      3
+    ],
+    "idle_only": [
+      1
+    ],
+    "mappo": [
+      1,
+      2,
+      3
+    ],
+    "random": [
+      1
+    ]
+  },
+  "files": [
+    "analysis_metadata.json",
+    "main_results.csv",
+    "main_results.md",
+    "main_results.pdf",
+    "main_results.png",
+    "order_robustness.csv",
+    "order_robustness.pdf",
+    "order_robustness.png",
+    "paired_deltas.csv",
+    "paired_deltas.pdf",
+    "paired_deltas.png",
+    "paired_summary.csv",
+    "per_seed_metrics.csv"
+  ],
+  "fixed_case_statistics_role": "auxiliary_not_training_seed_variance",
+  "order_summary_inputs": {
+    "attention_mappo": "runs/attention_mappo_highway/20261010_164825_144894_order-eval_seed_1/order_robustness_summary.json",
+    "ca_commappo": "runs/ca_commappo_highway/20261010_172830_981347_order-eval_seed_1/order_robustness_summary.json",
+    "mappo": "runs/mappo_highway/20261010_163415_404143_order-eval_seed_1/order_robustness_summary.json"
+  },
+  "paired_delta_direction": "target_minus_reference",
+  "paired_test": "exact_two_sided_sign_flip",
+  "paired_test_role": "auxiliary_exploratory_evidence",
+  "runs_manifest": "/home/fzx/CA-ComMAPPO/results/core_matrix_199ead5_final_runs_manifest.json",
+  "runs_manifest_sha256": "2d00a001622570fc0bad21163d863bc515b314a76bbec939351e18fb5f64c1e5",
+  "schema_version": 1,
+  "statistical_unit": "training_seed"
+}

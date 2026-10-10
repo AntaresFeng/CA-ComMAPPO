@@ -1,0 +1,712 @@
+{
+  "cases": [
+    {
+      "episode_seed": 20000,
+      "mean_attention": [
+        [
+          null,
+          0.11342884162993869,
+          0.012405936429593381,
+          0.904211534652859
+        ],
+        [
+          0.5703887093067169,
+          null,
+          0.5113626383699678,
+          0.05120292681709543
+        ],
+        [
+          0.7256928247374457,
+          0.23811062585463874,
+          null,
+          0.03619655147446571
+        ],
+        [
+          0.569829405285418,
+          0.27533120710228104,
+          0.3720096809510557,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.399614736919112,
+          "agent_1": 10.414507419559872,
+          "agent_2": 10.36,
+          "agent_3": 10.31263632437458
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 0,
+        "episode_reward": 10.371689620213392,
+        "phase": "ca_trace",
+        "score": 10.371689620213392,
+        "seed": 20000,
+        "steps": 89,
+        "throughput": 0.2247191011235955,
+        "travel_time": 17.8,
+        "truncated": false,
+        "waiting_time": 2.25
+      },
+      "steps": 89
+    },
+    {
+      "episode_seed": 20001,
+      "mean_attention": [
+        [
+          null,
+          0.08748567714343046,
+          0.011304620106521826,
+          0.9258137686706301
+        ],
+        [
+          0.5028304221090295,
+          null,
+          0.5451466745847079,
+          0.01615781234745644
+        ],
+        [
+          0.7463467280069987,
+          0.2266219696132364,
+          null,
+          0.02703130737774902
+        ],
+        [
+          0.5307743080071549,
+          0.2534458868285583,
+          0.41138624700599596,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.339614836805495,
+          "agent_1": 10.37470684811534,
+          "agent_2": 10.44,
+          "agent_3": 10.32906896765893
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 1,
+        "episode_reward": 10.370847663144941,
+        "phase": "ca_trace",
+        "score": 10.370847663144941,
+        "seed": 20001,
+        "steps": 86,
+        "throughput": 0.23255813953488372,
+        "travel_time": 17.2,
+        "truncated": false,
+        "waiting_time": 2.75
+      },
+      "steps": 86
+    },
+    {
+      "episode_seed": 20002,
+      "mean_attention": [
+        [
+          null,
+          0.05889144158514682,
+          0.011754191699825849,
+          0.9517567985587649
+        ],
+        [
+          0.4824145949445665,
+          null,
+          0.5602709922084324,
+          0.013341524185379967
+        ],
+        [
+          0.7826231704817878,
+          0.18595906906566217,
+          null,
+          0.03141776537522674
+        ],
+        [
+          0.5762465136229165,
+          0.2251858587867173,
+          0.4277990734340468,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.329614885266073,
+          "agent_1": 10.285302138690383,
+          "agent_2": 10.44,
+          "agent_3": 10.386935593097535
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 2,
+        "episode_reward": 10.360463154263497,
+        "phase": "ca_trace",
+        "score": 10.360463154263497,
+        "seed": 20002,
+        "steps": 89,
+        "throughput": 0.2247191011235955,
+        "travel_time": 17.8,
+        "truncated": false,
+        "waiting_time": 3.0
+      },
+      "steps": 89
+    },
+    {
+      "episode_seed": 20003,
+      "mean_attention": [
+        [
+          null,
+          0.06296954461560325,
+          0.009900662995928648,
+          0.9471407864774977
+        ],
+        [
+          0.5380770227370354,
+          null,
+          0.5300025060032303,
+          0.023651680410973944
+        ],
+        [
+          0.7525128202382908,
+          0.2065011672937671,
+          null,
+          0.04098600036529607
+        ],
+        [
+          0.5936937220926796,
+          0.23371397632749555,
+          0.37879794276582396,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.389614737402304,
+          "agent_1": 10.384712934340817,
+          "agent_2": 10.42,
+          "agent_3": 10.34202347232437
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 3,
+        "episode_reward": 10.384087786016872,
+        "phase": "ca_trace",
+        "score": 10.384087786016872,
+        "seed": 20003,
+        "steps": 93,
+        "throughput": 0.2150537634408602,
+        "travel_time": 18.6,
+        "truncated": false,
+        "waiting_time": 2.6500000000000004
+      },
+      "steps": 93
+    },
+    {
+      "episode_seed": 20004,
+      "mean_attention": [
+        [
+          null,
+          0.09262568272137478,
+          0.014357154394368061,
+          0.9184321965256782
+        ],
+        [
+          0.4887706916860975,
+          null,
+          0.574411977481031,
+          0.0375913743232479
+        ],
+        [
+          0.7458674745990875,
+          0.22347051058332387,
+          null,
+          0.0306620110628849
+        ],
+        [
+          0.5336566837887241,
+          0.23325379970954505,
+          0.44143819316068017,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.389614737886552,
+          "agent_1": 10.391215011519495,
+          "agent_2": 10.46,
+          "agent_3": 10.336261242638214
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 4,
+        "episode_reward": 10.394272748011065,
+        "phase": "ca_trace",
+        "score": 10.394272748011065,
+        "seed": 20004,
+        "steps": 92,
+        "throughput": 0.21739130434782605,
+        "travel_time": 18.400000000000002,
+        "truncated": false,
+        "waiting_time": 2.95
+      },
+      "steps": 92
+    },
+    {
+      "episode_seed": 20005,
+      "mean_attention": [
+        [
+          null,
+          0.04615313800361666,
+          0.007449248547661824,
+          0.9646470928803469
+        ],
+        [
+          0.4467978297302929,
+          null,
+          0.5779623236484829,
+          0.01969848149075495
+        ],
+        [
+          0.718395873128126,
+          0.2537396925769997,
+          null,
+          0.027864436405555654
+        ],
+        [
+          0.594642508106354,
+          0.22430652376575522,
+          0.41570719612112345,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.359614774649378,
+          "agent_1": 10.34989758642221,
+          "agent_2": 10.47,
+          "agent_3": 10.416239897660015
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 5,
+        "episode_reward": 10.398938064682902,
+        "phase": "ca_trace",
+        "score": 10.398938064682902,
+        "seed": 20005,
+        "steps": 95,
+        "throughput": 0.21052631578947367,
+        "travel_time": 19.0,
+        "truncated": false,
+        "waiting_time": 3.1500000000000004
+      },
+      "steps": 95
+    },
+    {
+      "episode_seed": 20006,
+      "mean_attention": [
+        [
+          null,
+          0.08074876942436629,
+          0.010276657588716893,
+          0.9369970607584801
+        ],
+        [
+          0.5554198981595359,
+          null,
+          0.5283140203470414,
+          0.034867190518321434
+        ],
+        [
+          0.7299822392432314,
+          0.2341660257998707,
+          null,
+          0.03585172145578422
+        ],
+        [
+          0.6011554395806962,
+          0.26509339913247126,
+          0.38238678255795905,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.389614737886552,
+          "agent_1": 10.384818201676774,
+          "agent_2": 10.370000000000001,
+          "agent_3": 10.403738437108277
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 6,
+        "episode_reward": 10.387042844167901,
+        "phase": "ca_trace",
+        "score": 10.387042844167901,
+        "seed": 20006,
+        "steps": 92,
+        "throughput": 0.21739130434782605,
+        "travel_time": 18.400000000000002,
+        "truncated": false,
+        "waiting_time": 2.5
+      },
+      "steps": 92
+    },
+    {
+      "episode_seed": 20007,
+      "mean_attention": [
+        [
+          null,
+          0.11717501934234116,
+          0.01079077019879565,
+          0.8984025186475586
+        ],
+        [
+          0.5064557216849855,
+          null,
+          0.5786875760484943,
+          0.04111581565878375
+        ],
+        [
+          0.7325727780197941,
+          0.22879840690384404,
+          null,
+          0.03862881435211315
+        ],
+        [
+          0.5295303811264389,
+          0.24927947821442187,
+          0.4251526145706542,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.369614758685072,
+          "agent_1": 10.322532560643872,
+          "agent_2": 10.42,
+          "agent_3": 10.301561732845302
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 7,
+        "episode_reward": 10.353427263043562,
+        "phase": "ca_trace",
+        "score": 10.353427263043562,
+        "seed": 20007,
+        "steps": 90,
+        "throughput": 0.2222222222222222,
+        "travel_time": 18.0,
+        "truncated": false,
+        "waiting_time": 2.7
+      },
+      "steps": 90
+    },
+    {
+      "episode_seed": 20008,
+      "mean_attention": [
+        [
+          null,
+          0.05598838322801688,
+          0.010932481913649605,
+          0.9558057077725728
+        ],
+        [
+          0.472991476721112,
+          null,
+          0.5689993696588335,
+          0.05842081171474146
+        ],
+        [
+          0.6128031712557588,
+          0.35520756671710496,
+          null,
+          0.031989243191977344
+        ],
+        [
+          0.586825263996919,
+          0.27060941813682554,
+          0.4092148830803429,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.399614730511143,
+          "agent_1": 10.433967717425519,
+          "agent_2": 10.41,
+          "agent_3": 10.370082725151821
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 8,
+        "episode_reward": 10.403416293272121,
+        "phase": "ca_trace",
+        "score": 10.403416293272121,
+        "seed": 20008,
+        "steps": 98,
+        "throughput": 0.2040816326530612,
+        "travel_time": 19.6,
+        "truncated": false,
+        "waiting_time": 2.9000000000000004
+      },
+      "steps": 98
+    },
+    {
+      "episode_seed": 20009,
+      "mean_attention": [
+        [
+          null,
+          0.06359223468306092,
+          0.008393514098428846,
+          0.9474816878636678
+        ],
+        [
+          0.4812054723110383,
+          null,
+          0.597932473880387,
+          0.03831307669133821
+        ],
+        [
+          0.7266070004966524,
+          0.23911526106777375,
+          null,
+          0.034277733275666834
+        ],
+        [
+          0.5581463244557381,
+          0.2392463014160577,
+          0.4386940672342563,
+          null
+        ]
+      ],
+      "outcome": {
+        "agent_arrival_fraction": 1.0,
+        "agent_collision_fraction": 0.0,
+        "agent_rewards": {
+          "agent_0": 10.37961474493692,
+          "agent_1": 10.323308738645132,
+          "agent_2": 10.44,
+          "agent_3": 10.374356496134048
+        },
+        "arrival": true,
+        "arrived_agents": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "collision": false,
+        "crashed_agents": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "episode_index": 9,
+        "episode_reward": 10.379319994929025,
+        "phase": "ca_trace",
+        "score": 10.379319994929025,
+        "seed": 20009,
+        "steps": 99,
+        "throughput": 0.20202020202020202,
+        "travel_time": 19.8,
+        "truncated": false,
+        "waiting_time": 3.2
+      },
+      "steps": 99
+    }
+  ],
+  "effective_lambda_max": 1.0679261684417725,
+  "effective_lambda_min": 1.0679261684417725,
+  "episode_summary": {
+    "arrival_rate": 1.0,
+    "collision_rate": 0.0,
+    "episodes": 10,
+    "mean_agent_arrival_fraction": 1.0,
+    "mean_agent_collision_fraction": 0.0,
+    "mean_agent_reward": 10.380350543174528,
+    "mean_episode_length": 92.3,
+    "mean_episode_reward": 10.380350543174528,
+    "mean_throughput": 0.2170683086603546,
+    "mean_travel_time": 18.46,
+    "mean_waiting_time": 2.805,
+    "truncation_rate": 0.0
+  },
+  "mean_attention_all_cases": [
+    [
+      null,
+      0.07810653070533463,
+      0.010730100130601928,
+      0.936011465530942
+    ],
+    [
+      0.5038215104382784,
+      null,
+      0.5587951691774039,
+      0.033543104443511836
+    ],
+    [
+      0.7280048665012003,
+      0.23869273524098122,
+      null,
+      0.03330239446997195
+    ],
+    [
+      0.5679029311287923,
+      0.24658307299151266,
+      0.4116814501730804,
+      null
+    ]
+  ],
+  "plot_paths": [
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20000.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20000.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20001.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20001.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20002.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20002.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20003.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20003.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20004.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20004.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20005.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20005.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20006.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20006.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20007.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20007.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20008.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20008.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20009.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_seed_20009.pdf",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_all_cases.png",
+    "/home/fzx/CA-ComMAPPO/runs/ca_commappo_highway/20261010_173213_438857_ca-trace_seed_1/ca_trace_plots/attention_all_cases.pdf"
+  ],
+  "schema_version": 1,
+  "trace_steps": 923
+}
