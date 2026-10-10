@@ -91,6 +91,11 @@ seeds `20000..20005` 的 6 个视频。逐 run 审计 checkpoint/sidecar SHA、�
 
 ## 阶段五：聚合与归档
 
+截至 2026-10-10，核心矩阵和扩展矩阵的全部正式 benchmark、final test 与视频均已
+完成，当前没有运行中的实验。扩展矩阵已有位于 `runs/matrix_state/` 的严格 manifest
+与聚合 CSV，但尚未归档到 `results/`；核心矩阵尚未建立正式 manifest。顺序扰动、
+attention/TTC trace 和核心 `paper-analysis` 仍待执行。
+
 - 在冻结提交上完成顺序扰动与 attention/TTC 导出。
 - 每个算法建立显式 seeds 1/2/3 manifest，通过严格聚合器后生成审定 CSV。
 - 核心四算法与后续修复提交上的扩展三算法分别建立 manifest；扩展结果在论文中明确

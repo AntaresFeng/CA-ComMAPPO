@@ -56,26 +56,25 @@ IC3Net 使用 RNN backbone，适合作为系统级通信基线，但不是严格
 | 项目 | 状态 |
 | --- | --- |
 | 环境适配、统一指标、固定评估 seed、provenance v2 | 已完成 |
-| MAPPO canonical 配置与 seed 1 benchmark/final/video | 已完成 |
+| 核心矩阵：MAPPO、Attention-MAPPO、CA-ComMAPPO full/no-prior，seeds 1/2/3 | 已完成；冻结提交 `199ead5`，均含 benchmark、100-case final test 与 6-case 视频 |
+| 扩展矩阵：IPPO、CommNet、IC3Net，seeds 1/2/3 | 已完成；修复提交 `d50ed20`，均含 benchmark、100-case final test 与 6-case 视频 |
 | random / idle-only 同 case 正式结果 | 已完成 |
-| IPPO、Attention-MAPPO、CommNet、IC3Net、CA-ComMAPPO 代码与主配置 | 已有，需逐项重新 smoke |
-| MAPPO seeds 2/3 | 未运行 |
-| 其他学习算法多 seed 正式训练 | 未运行 |
 | 顺序扰动 evaluator | 已实现，待最终 checkpoint 生成正式 artifact |
 | attention/TTC 导出和 heatmap | 已实现，待最终 checkpoint 生成正式 artifact |
-| 跨车辆数 checkpoint 兼容协议 | 未设计完成 |
-| 多 seed 配对统计与论文绘图工具 | 已实现，待正式 artifact |
+| 多 seed 配对统计与论文绘图工具 | 已实现，待核心 manifest、顺序扰动 artifact 与正式 `paper-analysis` 输出 |
 | 最终统计结果审定与论文归档 | 未完成 |
 
-当前只能把历史 MAPPO/CA-ComMAPPO seed 1 作为预实验参考；provenance v1 结果不进入
-新的正式聚合，不能形成跨算法论文结论。
+核心矩阵与扩展矩阵来自不同冻结提交，必须分别聚合。扩展矩阵只作补充描述性比较，
+不能与核心矩阵放入同一个严格 manifest 或配对检验。provenance v1 历史结果仍只作
+预实验参考，不进入新的正式聚合。
 
 ## 实施顺序
 
-1. 在同一提交上 smoke 全算法，冻结算法矩阵和训练 seed 集 `[1,2,3]`。
-2. 在最终冻结提交上依次重跑 MAPPO、Attention-MAPPO、CA-ComMAPPO/no-prior，随后
-   运行 IPPO、CommNet、IC3Net。
-3. 用显式 manifest 聚合，完成统计检验、图表和最终结果文档。
+1. 为核心矩阵与扩展矩阵分别建立显式 manifest，并通过严格聚合器复核。
+2. 在核心冻结提交 `199ead5` 上生成 MAPPO、Attention-MAPPO 的顺序扰动 artifact，
+   以及 CA-ComMAPPO full/no-prior 的 attention/TTC trace。
+3. 对核心矩阵运行 `paper-analysis`，完成配对统计、图表和最终结果文档；扩展矩阵只
+   保留独立聚合与补充说明。
 
 本论文固定四车任务，不开展 4→6/8/10 checkpoint 泛化实验，也不声明规模泛化能力。
 
