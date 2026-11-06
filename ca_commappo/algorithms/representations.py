@@ -1,13 +1,5 @@
 """Permutation-invariant social-attention representation for highway-env.
 
-This module provides ``PermutationInvariantAttention`` — a drop-in replacement
-for ``Basic_MLP`` that is invariant to the ordering of the surrounding
-vehicles. It implements the social-attention encoder from the paper plan
-(``docs/thesis-planning.md`` §3):
-
-    e_ij = phi(o_i, o_j)          # ego <-> neighbour pairwise encoding
-    z_i  = AttnPool({e_ij})       # masked attention pooling
-
 The ego (controlled) vehicle is always at observation index 0 (highway-env's
 ``KinematicObservation`` shuffles only ``obs[1:]``), so it is used as the
 fixed query. The remaining vehicles are pooled with a presence-masked
@@ -18,9 +10,9 @@ The same class serves both the actor and the MAPPO global-state critic:
 * actor input  : one agent's flattened view, shape ``(105,)``  -> 1 view;
 * critic input : the concatenated global state, shape
   ``(n_agents * 105,)`` -> ``n_agents`` views. Per-view embeddings are
-  mean-pooled, so the critic is also invariant to agent order and count —
-  the property that lets Attention-MAPPO / CA-ComMAPPO generalise to unseen
-  numbers of controlled vehicles (Phase 4).
+  mean-pooled. Pooling is order-invariant, but the configured input shape and
+  policy agent identities still constrain checkpoint compatibility across
+  vehicle counts; this encoder alone does not establish size generalization.
 """
 
 from __future__ import annotations

@@ -75,8 +75,7 @@ def build_episode_record(
         }
     )
 
-    # Phase 4 reporting metrics (conditional on dt / waiting_steps). These are
-    # for reporting only; they never enter the best-model sort key.
+    # These efficiency metrics do not enter the current best-model sort key.
     if dt is not None:
         travel_time = float(int(steps) * float(dt))
         duration = travel_time
@@ -139,7 +138,6 @@ def summarize_episode_records(records: list[dict[str, Any]]) -> dict[str, float 
     for key in ("agent_collision_fraction", "agent_arrival_fraction"):
         if all(key in record for record in records):
             summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)
-    # Phase 4 reporting metrics (conditional; only when every record carries them).
     for key in ("travel_time", "episode_duration", "throughput", "waiting_time"):
         if all(key in record for record in records):
             summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)

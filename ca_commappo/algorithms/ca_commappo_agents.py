@@ -1,16 +1,9 @@
-"""CA-ComMAPPO: Conflict-Aware Communication MAPPO (the paper's innovation).
+"""Legacy CA-ComMAPPO integration with XuanCe's categorical MAPPO.
 
-Builds on MAPPO with:
-* the permutation-invariant social encoder (Phase 1, reused) for ``z_i``;
-* a conflict-aware communication module (``ConflictAwareComm``) that replaces
-  CommNet's mean aggregation with ``c_i = sum_{j!=i} alpha_ij W_v m_j`` where
-  ``alpha_ij = softmax(q_i^T k_j + b_ij)`` carries a kinematic conflict prior.
-
-Design frozen in ``docs/ca_commappo_design.md``. Implementation choice: the comm
-is folded into the actor representation (``CAComMAPPOActorRep``) so that
-``MAAC_Policy.forward`` and ``MAPPO_Learner`` are reused unchanged (the actor
-input dim auto-includes the comm context). ``CA_ComMAPPO_Policy`` /
-``CA_ComMAPPO_Learner`` are thin subclasses for config-string naming.
+Communication is embedded in the actor representation. Policy and learner
+subclasses provide the active-agent mask context while reusing PPO updates.
+The intent/TTC research design is retired; keeping this implementation does not
+prescribe the next algorithm. See ``docs/current_experiment_status.md``.
 """
 
 from __future__ import annotations
@@ -53,9 +46,9 @@ class CAComMAPPOActorRep(Module):
     automatically. The critic uses the plain ``PermutationInvariantAttention``
     (no comm), built separately by the agent.
 
-    The ego vehicle (obs index 0) carries *absolute* position/velocity under
-    ``absolute: false`` (see design doc §2), so each agent computes its own
-    ``ttc_i`` / ``intent_i`` locally (CTDE-compliant).
+    The ego row carries normalized world position/velocity even with
+    ``absolute: false``. The legacy proxy head uses this fixed observation
+    convention; it does not infer route intent or pairwise collision time.
     """
 
     def __init__(

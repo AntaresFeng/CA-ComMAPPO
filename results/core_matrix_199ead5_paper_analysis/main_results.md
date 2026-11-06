@@ -1,5 +1,8 @@
 # Main final-test results
 
+> 历史记录：以下内容来自 highway-env 1.11 旧任务，不代表当前环境性能。
+> 旧论文计划及 intent/TTC 设计已作废；历史范围与指标解释见 [结果索引](../README.md)。
+
 Training seed is the statistical unit. Values are mean ± sample std; 
 fixed static policies are reported as point estimates.
 

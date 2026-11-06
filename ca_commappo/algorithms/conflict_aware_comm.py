@@ -1,27 +1,12 @@
-"""Conflict-aware communication module for CA-ComMAPPO.
+"""Legacy CA attention over messages containing kinematic proxy fields.
 
-Implements the conflict-aware attention aggregation from the paper plan
-(``docs/thesis-planning.md`` §3, frozen in ``docs/ca_commappo_design.md``):
+The intent/TTC research design has been retired; this implementation remains
+for existing experiments. Its fields are not route intent or pairwise collision
+times. See ``docs/current_experiment_status.md`` for the current research status.
 
-    m_i = f_m(z_i, intent_i, ttc_i)          # agent i's message (built by the
-                                              # actor representation; carries ttc
-                                              # and intent in its tail)
-    c_i = sum_{j != i} alpha_ij * W_v m_j     # conflict-aware aggregation
-    alpha_ij = softmax_j( q_i^T k_j + b_ij )  # soft conflict-prior attention
-
-with the conflict prior
-
-    b_ij = -lambda * |ttc_i - ttc_j| - mu * (R_i + R_j),   R_i = 1 - intent_i
-
-The first term makes two agents that reach the conflict point at similar times
-attend to each other; the second (recency penalty) ensures pairs of receding
-agents (both ``ttc == TTC_MAX``) do not get spuriously high attention just
-because their ttcs match.
-
-This is a drop-in replacement for the *aggregation* step of XuanCe's ``CommNet``
-(mean -> conflict-aware attention). It operates on a batch reshaped to
-``(n_env, n_agents, msg_dim)`` and returns ``c`` of shape
-``(n_env, n_agents, comm_dim)``.
+Inputs have shape ``(n_env, n_agents, msg_dim)``; outputs have shape
+``(n_env, n_agents, comm_dim)``. Attention excludes self and inactive senders,
+returning zero context when no sender is available.
 """
 
 from __future__ import annotations
@@ -33,8 +18,7 @@ from torch import nn
 from torch.nn import functional as F
 from xuance.torch import Module
 
-# Cap for the TTC proxy of agents that are not approaching the conflict point
-# (receding / stationary). Matches docs/ca_commappo_design.md.
+# Cap for the legacy time-to-centre proxy, before its bounded transformation.
 TTC_MAX = 50.0
 
 
@@ -52,8 +36,7 @@ class ConflictAwareComm(Module):
                     penalty ``R_i = 1 - intent_i``).
     recede_penalty: fixed hyperparameter ``mu`` penalising receding pairs.
     lam_init:       initial value of the learnable scalar ``lambda``.
-    use_conflict_prior: if False, ``b_ij = 0`` (ablation (c): attention comm
-                    with the conflict prior removed; scores are ``q.k`` only).
+    use_conflict_prior: if False, omit the proxy-based attention bias.
     """
 
     def __init__(

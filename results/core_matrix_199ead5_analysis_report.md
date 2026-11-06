@@ -1,4 +1,7 @@
-# 核心矩阵 199ead5 论文分析结论
+# 核心矩阵 199ead5 历史分析
+
+> 历史记录：以下内容来自 highway-env 1.11 旧任务，不代表当前环境性能。
+> 旧论文计划及 intent/TTC 设计已作废；历史范围与指标解释见 [结果索引](README.md)。
 
 本报告汇总冻结提交 `199ead5d8b2fababa649d3aa94c1c025eb08d682` 的正式核心矩阵、
 配对统计、观测顺序稳健性和 CA attention/TTC trace。主统计单位是训练 seed；所有
@@ -8,24 +11,24 @@
 机器可读结果与图位于 [`core_matrix_199ead5_paper_analysis/`](core_matrix_199ead5_paper_analysis/)，
 严格输入清单为 [`core_matrix_199ead5_final_runs_manifest.json`](core_matrix_199ead5_final_runs_manifest.json)。
 
-## 结论
+## 旧任务中的观察
 
-- **H1 得到支持。** MAPPO 的 arrival 为 `36.0% ± 12.1%`、collision 为
+- **静态策略对比。** MAPPO 的 arrival 为 `36.0% ± 12.1%`、collision 为
   `12.3% ± 17.9%`；random 分别为 `10.0%`、`75.0%`，idle-only 分别为
   `17.0%`、`83.0%`。静态策略是固定策略点估计，不把它们的 episode 波动解释为
   训练 seed 方差。
-- **H2 得到直接支持。** 对 seed 1 checkpoint 的 100 个固定 cases，MAPPO 在三组
+- **观测行置换。** 对 seed 1 checkpoint 的 100 个固定 cases，MAPPO 在三组
   邻车行置换下的 arrival 配对均值分别变化 `-0.11/-0.11/-0.08`，collision 分别变化
   `+0.72/+0.72/+0.69`。Attention-MAPPO 和辅助 CA-ComMAPPO 的所有配对指标在三组
   置换下均为 `0`，与其 permutation-invariant encoder 合同一致。
-- **H3 未得到明确支持。** CA-ComMAPPO 相对 Attention-MAPPO 的三 seed arrival 差为
+- **通信收益尚不明确。** CA-ComMAPPO 相对 Attention-MAPPO 的三 seed arrival 差为
   `+0.073 ± 0.140`，但 collision 差为 `+0.020 ± 0.030`，reward 差为
   `-0.261 ± 0.949`。当前结果不能声称显式通信整体优于 Attention-MAPPO。
-- **H4 得到方向一致但样本量有限的支持。** full 相对 no-prior 的 arrival 差为
+- **旧先验消融呈方向一致差异。** full 相对 no-prior 的 arrival 差为
   `+0.433 ± 0.240`、collision 差为 `-0.087 ± 0.091`、reward 差为
   `+3.470 ± 2.620`。三项精确双侧 sign-flip `p=0.25`；三个训练 seed 下这是同向差值
   能达到的最小 p 值，只能作为探索性辅助，结论应以效应量和逐 seed 原始值为主。
-- **H5 已形成可审计证据。** full/no-prior 均完成 seed 1、cases `20000..20009` 的只读
+- **旧 CA trace 已归档。** full/no-prior 均完成 seed 1、cases `20000..20009` 的只读
   attention/TTC trace。总览热力图、摘要、metadata 和 raw-record SHA 归档在
   [`core_matrix_199ead5_ca_trace/`](core_matrix_199ead5_ca_trace/)；10-case outcome 只用于
   解释具体案例，不替代多 seed 性能比较。
@@ -54,9 +57,6 @@ SHA-256，因此仍可检查原始记录是否发生变化。
 ## 执行与边界
 
 - order-eval 与 ca-trace 均从冻结提交 `199ead5` 的干净隔离 checkout 执行，设备为 CPU。
-  执行当时 PyTorch CUDA 初始化报 `CUDA unknown error`，因而未强制使用不可用的 CUDA
-  上下文。主机重启后，RTX 3080 已于 2026-10-10 通过 PyTorch 张量探测和 CA-ComMAPPO
-  真实 action/update smoke；这不改变既有 CPU artifact 的 provenance，也不触发重跑。
 - 后台 CA 队列通过 `runs/launch_scripts/run_posthoc_analysis_199ead5.sh` 在 tmux session
   `paper-posthoc-199ead5` 中串行执行，event log 以
   `QUEUE COMPLETE all posthoc artifacts passed` 收尾。

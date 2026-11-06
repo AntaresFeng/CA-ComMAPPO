@@ -7,9 +7,8 @@
 - `ca_commappo/envs/highway_intersection_wrapper.py`：XuanCe 字典接口、存活 mask、奖励屏蔽和等待时间。
 - `configs/highway/ca-intersection-v0.yaml`：当前共享任务配置。
 
-旧 `intersection-multi-agent-v1` 实验属于 highway-env 1.11 的历史任务，结果和 checkpoint
-不能直接作为新环境的对照。升级依赖、环境 ID、配置和 runtime source 均进入现有
-provenance 校验；历史结果保留原样，不覆盖 metadata。
+历史任务与结果见 [results/README.md](../results/README.md)，实验版本校验见
+[实验手册](experiments_runbook.md)。
 
 ## 配置与上游修复
 
@@ -66,14 +65,14 @@ controlled_vehicle_specs:
 离散动作保持 `0=SLOWER, 1=IDLE, 2=FASTER`，默认目标速度档为 `[0, 4.5, 9]`。
 `IDLE` 保持目标速度，不代表停车。`initial_speed` 控制初始实际速度。
 
-本阶段保留现有算法使用的 `15×7` 观测布局：
+当前算法使用 `15×7` 观测布局：
 `presence, x, y, vx, vy, cos_h, sin_h`。第 0 行是 ego；`absolute: false` 时 ego 行仍是
-归一化世界坐标，其他车辆行为相对坐标。CA 的现有运动学代理仍依赖这一布局。
+归一化世界坐标，其他车辆行为相对坐标。PI 编码器与遗留 CA 实现依赖这一布局。
 
 `perception_distance` 可配置观测选车半径，默认 200 m；目前没有建筑遮挡。
 `info["agents_navigation"]` 暴露逐车的入口、目的地和出生参数，用于场景审计与后续导航
 输入设计。它是集中诊断数据，不能未经信息权限设计就把所有车辆的私有路线喂给 actor。
-本轮没有改变 actor 输入维度，也没有实现意图预测/通信算法。
+尚未实现新的意图识别/共享算法；旧 CA 方案已作废，见 [实现现状](current_experiment_status.md)。
 
 原生 Kinematics 支持 `cos_d/sin_d` 导航方向特征，但切换特征列表前还需同步修改项目中
 固定布局的 PI/CA representation；不能仅改 YAML 就宣称现有算法已使用导航信息。

@@ -46,8 +46,7 @@ ent_coef: 0.03
 target_kl: 0.25
 clip_range: 0.2
 clip_type: 1
-# Canonical MAPPO baseline discount contract shared by subsequent algorithms
-# and paper comparisons.
+# Shared training defaults; experiment-specific overrides belong in algorithm YAML.
 gamma: 0.99
 
 use_linear_lr_decay: false

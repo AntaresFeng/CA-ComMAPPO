@@ -24,7 +24,7 @@ dev = [
 pythonpath = ["."]
 
 [tool.ruff]
-extend-exclude = ["docs/archived", "examples/mappo"]
+extend-exclude = ["examples/mappo"]
 
 [tool.setuptools.packages.find]
 include = ["ca_commappo*"]

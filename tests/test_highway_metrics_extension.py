@@ -1,11 +1,3 @@
-"""Tests for the Phase 4 metric extension (throughput / waiting / travel time).
-
-The new metrics are *conditional* (backward-compatible): they appear only when
-the episode record carries ``waiting_steps`` and ``dt`` (supplied by the adapter
-in real runs). When absent, the summary keeps the original 9 keys. The best-model
-sort key (``_summary_sort_key``) must NOT change.
-"""
-
 from __future__ import annotations
 
 import pytest

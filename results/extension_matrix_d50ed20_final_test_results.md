@@ -1,5 +1,8 @@
 # 扩展矩阵 d50ed20 正式 final test 结果
 
+> 历史记录：以下内容来自 highway-env 1.11 旧任务，不代表当前环境性能。
+> 旧论文计划及 intent/TTC 设计已作废；历史范围与指标解释见 [结果索引](README.md)。
+
 > 本报告只统计**冻结提交 `d50ed20`** 上已完成并通过 artifact 审计的扩展算法：IPPO、CommNet、IC3Net，各训练 seeds 1/2/3。
 >
 > - 冻结 commit：`d50ed20a9b5bcef3a34f26533e77bc7d2d8439c3`

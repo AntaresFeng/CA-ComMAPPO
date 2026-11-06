@@ -60,8 +60,6 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self._active_agents = self._all_agents_active()
         self._last_agent_mask = self._all_agents_active()
         self._arrived_agents = {agent: False for agent in self.agents}
-        # Per-agent accumulated low-speed step count for the waiting-time metric
-        # (Phase 4). Persisted across steps within an episode, reset on reset().
         self._waiting_steps = {agent: 0 for agent in self.agents}
         self._dt = self._compute_dt()
 

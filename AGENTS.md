@@ -1,53 +1,42 @@
 # CA-ComMAPPO 仓库指南
 
-## 项目目标
+## 当前方向与事实源
 
-本仓库将 highway-env 无信号交叉路口适配到 XuanCe 多智能体接口，并实现
-IPPO、MAPPO、Attention-MAPPO、CommNet、IC3Net 与 CA-ComMAPPO 的可复现实验管线。
-它是本地研究仓库，不按 Python 发布包流程管理；不要执行 `uv build`。
+本仓库研究无信号路口多智能体协作，使用 highway-env 1.12.1、项目环境
+`ca-intersection-v0` 与 XuanCe。当前只考虑理想通信。
 
-## 权威资料
+**旧论文计划、固定四车论文范围、旧 H1–H6 假设及 intent/TTC 算法设计已作废。**
+CA-ComMAPPO full/no-prior 代码保留为遗留实现，不是新算法的规定方案；不得从历史
+报告、提示词或现有变量名恢复这些设计约束。新论文问题与算法尚未确定。
 
-开始任务前先从 [`docs/README.md`](docs/README.md) 选择相关专题。重要口径：
+开始任务先读 [文档导航](docs/README.md)，按需查看：
 
-- [`docs/environment.md`](docs/environment.md)：环境、动作、reward、终止和指标事实源。
-- [`docs/mappo_baseline.md`](docs/mappo_baseline.md)：后续对比统一使用的任务与 MAPPO 合同。
-- [`docs/ca_commappo_design.md`](docs/ca_commappo_design.md)：创新算法定义及正式训练阻断项。
-- [`docs/experiments_runbook.md`](docs/experiments_runbook.md)：smoke、正式训练、验证、视频与聚合。
-- [`docs/thesis-planning.md`](docs/thesis-planning.md)：论文实验矩阵和剩余证据。
+- [实现现状](docs/current_experiment_status.md)：已有能力、遗留代码、未解决问题。
+- [环境说明](docs/environment.md)：观测、动作、奖励、终止、mask 与指标。
+- [实验手册](docs/experiments_runbook.md)：当前命令、评估与 provenance 行为。
+- [历史结果](results/README.md)：旧任务证据，不作为新环境的基线成绩。
 
-`docs/archived/` 只用于历史追溯，不得从中复制当前配置、命令或实验数字。若文档与
-canonical YAML 冲突，参数以 YAML 为准；若文档与实现冲突，先核对代码和测试，并在
-同一变更中修正文档。
+参数以 YAML 为准，行为以代码和测试为准。发现冲突时核对并同步修正文档。
+默认参数和已有评估协议可以随研究调整；变更时说明可比性影响并建立新实验版本，
+不要把旧论文范围或文档中的门禁当作研究设计限制。
 
-## 目录职责
+## 目录与实现
 
-- `ca_commappo/envs/`：highway-env 适配器与环境调试入口。
-- `ca_commappo/algorithms/`：自定义 representation、通信模块和运行时注册/兼容补丁。
-- `ca_commappo/training/`：统一学习算法训练、benchmark 和 test 入口。
-- `ca_commappo/evaluation/`：共享指标、artifact、provenance、视频与结果聚合。
-- `ca_commappo/cli/`：sanity baseline 等普通命令行入口。
-- `configs/common.yaml`：共享训练合同；`configs/highway/`：共享任务合同；
-  `configs/<algorithm>/`：只保留算法差异。
-- `tests/`：pytest 行为和回归测试。
-- `results/`：受 Git 跟踪的审定 manifest、聚合表和小型 provenance 摘要。
-- `runs/`：被 Git 忽略的 checkpoint、日志、视频和原始评估 artifact。
-- `examples/mappo/`：vendored XuanCe 上游参考，禁止放项目维护代码。
+- `ca_commappo/envs/` 管理道路、车辆生命周期和 XuanCe 适配。
+- `ca_commappo/algorithms/` 管理 representation、通信模块与运行时注册/补丁。
+- `ca_commappo/training/`、`evaluation/`、`cli/` 管理训练、共享评估与命令入口。
+- `configs/common.yaml` 是共享训练默认值；`configs/highway/` 是环境参数；算法目录
+  只存差异。所有环境选项通过 `highway_config` 传入，嵌套配置由环境子类递归合并。
+- `tests/` 保存行为与回归测试；`examples/mappo/` 是 vendored 上游参考，不放项目代码。
+- 不编辑 `.venv` 或 site-packages；通过仓库子类、注册或兼容补丁接入上游。
+  本仓库不是发布包，不执行 `uv build`。
+- 保留到达后的物理退出、固定 agent 槽位与 mask 语义。评估读取 adapter 的逐车
+  `info`；masked reward 与 `raw_agents_rewards` 的区别见环境说明。
+- 用户意图明确时直接实现，改动保持聚焦；保护用户已有修改，不做 destructive reset。
 
-## 开发命令
+## 验证
 
-日常使用 `uv run`：
-
-```bash
-uv run python main.py sanity --config configs/sanity/highway_intersection.yaml --policy all
-uv run python main.py debug-wrapper --target wrapper --seed 7 --max-steps 1
-uv run python main.py mappo \
-  --config configs/mappo/ca-intersection-v0.yaml \
-  --smoke --mode train --no-save
-uv run pytest -q
-```
-
-提交前运行：
+常用短检查见根目录 README。提交前执行：
 
 ```bash
 ruff check --fix
@@ -55,51 +44,22 @@ ruff format
 uv run pytest -q
 ```
 
-若工具在当前环境缺失，应如实记录，不要修改 `.venv` 或依赖锁来绕过一次文档任务。
+测试保护可观察行为、非平凡不变量和真实回归，优先扩展已有测试；不要为普通参数、
+字面值、删除项或覆盖率单独增加测试。环境测试使用固定 seed，并在 `finally` 中关闭。
+通信改动应覆盖真实 action/eval 路径。注释解释原因与边界，不复述代码。
+工具缺失时如实记录，不为文档任务修改依赖或虚拟环境。
 
-## 实现原则
+## 实验与文档维护
 
-- 用户意图清楚时直接实现，保持改动小、可读且符合现有结构。
-- 不编辑 `.venv` 或 XuanCe site-packages；自定义组件通过仓库代码运行时注册或补丁接入。
-- 所有 highway-env 选项通过 `highway_config` 传入；嵌套 `observation` / `action`
-  由项目环境子类递归合并；不再重建上游默认配置。
-- `ca-intersection-v0` 使用 `Discrete(3)`：`0=SLOWER`、`1=IDLE`、
-  `2=FASTER`。离散 MARL policy 使用 categorical action distribution。
-- `step()` 的 `rewards` 与 `info["agents_rewards"]` 是 masked adapter-facing reward；
-  原始 per-agent reward 只在 `info["raw_agents_rewards"]`。
-- best checkpoint 排序固定为 `arrival↑ → collision↓ → reward↑ → length↓`。改变该键
-  会破坏跨实验可比性，除非用户明确批准新协议并重跑全部对照。
-- 公共算法/环境合同改变时，同步更新 canonical 配置、相关文档和 provenance 校验。
-
-## 测试与注释
-
-- 普通参数实验无需新增测试。修改核心适配器、算法语义、评估协议或准备提交时运行完整
-  `uv run pytest -q`。
-- 测试只保护可观察行为、非平凡不变量、边界或真实回归。优先扩展现有行为边界，避免
-  只镜像常量、实现细节或已删除功能的 tombstone 测试。
-- 环境测试使用确定性 seed，并在 `finally` 中关闭环境。涉及通信算法时至少覆盖真实
-  action/eval 路径，而不只验证张量形状。
-- 注释解释不明显的原因、外部兼容约束或安全不变量；不要复述符号名和直观控制流。
-
-## 正式实验规范
-
-- 正式训练必须设置 `WANDB_MODE=offline`、使用 `--mode benchmark`，并在独立具名 tmux
-  session 中运行。烟测和临时调试不是正式实验。
-- 每个算法/seed 使用独立 run；训练开始后冻结代码、配置和依赖锁，直到 final test
-  完成。不要覆盖已有 `eval_metadata.json`。
-- 最终数字只取带严格 provenance 的 `best_model.pth`，在固定 100 cases 上执行独立
-  `--mode test`。benchmark eval 只用于 checkpoint selection。
-- `--allow-unverified-model` 只用于诊断旧模型，不得生成论文结果。
-- 不提交 `runs/`。提交 `results/` 前先确认文件是小型、可重算且经过人工审定的结果，
-  不要用 `git add -f` 绕过忽略规则。
-- 每完成一个实现、实验或文档整理阶段就创建一次聚焦的 Git 提交；使用 Conventional
-  Commit，例如 `feat:`、`fix:`、`experiment:`、`docs:`、`test:`、`refactor:`、`chore:`。
-
-## 工作树与文档纪律
-
-- 用户已有改动属于用户；保留无关修改，不做 destructive reset/checkout。
-- 当前规范放在 `docs/` 根目录，每个文件只解释一个主题。历史决策放
-  `docs/archived/`，普通重复材料直接删除并交由 Git 历史追溯。
-- 新命令只有在代码已经支持且至少完成 smoke 后才能写入 runbook。未实现的研究工作只
-  写在 thesis planning，不能伪装成可执行流程。
-- 实验文档记录 YAML、完整命令、Git commit、seed、设备、artifact 路径和偏离协议之处。
+- 正式训练使用 `WANDB_MODE=offline`、`--mode benchmark`，长任务通过具名 tmux
+  session 启动；每个算法/seed 独立 run，并记录配置、commit、设备、命令和产物路径。
+- 当前正式加载与聚合有源码、训练合同和 checkpoint provenance 校验，具体见实验手册。
+  同一轮 benchmark/final test 使用匹配版本；调整协议时同步配置、校验和对照。
+- smoke、模型选择期评估和 `--allow-unverified-model` 诊断不能冒充正式 final test。
+  不覆盖已有 metadata，不把新旧任务结果混为同一实验。
+- `runs/` 不提交；`results/` 仅保存人工审定的小型可追溯结果，不用 `git add -f`
+  绕过忽略规则。每个实现、实验或文档阶段创建聚焦的 Conventional Commit。
+- 当前文档按主题维护，避免重复参数表和多套状态清单。失效计划、提示词与重复教程
+  直接删除，使用 Git 历史追溯；历史结果统一从 `results/README.md` 进入。
+- 只把代码已支持且经过烟测的命令写入操作手册。尚未实现的研究想法明确标为待设计，
+  不包装成既定算法、完成能力或已证实的论文结论。

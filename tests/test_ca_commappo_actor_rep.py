@@ -1,16 +1,3 @@
-"""Tests for CAComMAPPOActorRep (PI encoder + conflict-aware comm, forward shape).
-
-These pin the actor representation contract for Phase 3:
-
-* ``output_shapes`` is ``{'state': (H + comm_dim,)}``;
-* ``forward`` on a param-sharing batch ``(n_env*n_agents, 105)`` returns a
-  ``{'state': (batch, H + comm_dim)}`` dict with finite values;
-* the per-agent scaled ``ttc``/``intent`` derived from the ego row are correct:
-  an ego heading *toward* the conflict point C=(0,0) is flagged approaching
-  (``intent=1``, ``0 <= ttc < 1``); an ego heading *away* is receding and
-  receives the capped rationally scaled TTC.
-"""
-
 from __future__ import annotations
 
 import numpy as np

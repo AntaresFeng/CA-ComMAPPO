@@ -1,5 +1,8 @@
 # 核心矩阵 199ead5 正式 final test 结果
 
+> 历史记录：以下内容来自 highway-env 1.11 旧任务，不代表当前环境性能。
+> 旧论文计划及 intent/TTC 设计已作废；历史范围与指标解释见 [结果索引](README.md)。
+
 > 本报告只统计**冻结提交 `199ead5`** 上已完成并通过自动队列审计的核心矩阵：
 > MAPPO、Attention-MAPPO、CA-ComMAPPO (full)、CA-ComMAPPO no-prior，各训练 seeds 1/2/3。
 >

@@ -1,16 +1,3 @@
-"""Tests for ConflictAwareComm (the CA-ComMAPPO conflict-aware attention module).
-
-These tests pin down the Phase 3 comm module contract:
-
-* output shape is ``(n_env, n_agents, comm_dim)``;
-* attention weights sum to 1 over receivers ``j`` and exclude self (``j == i``);
-* dead agents (``alive_ally == 0``) are masked out;
-* the conflict prior ``b_ij = -lambda * |ttc_i - ttc_j|`` is monotonically
-  decreasing in ``|ttc_i - ttc_j|`` (closer arrival times -> higher attention);
-* a pair of agents both approaching the conflict point (small, similar ttc)
-  gets higher mutual attention than a pair of receding agents (ttc = TTC_MAX).
-"""
-
 from __future__ import annotations
 
 import math
@@ -197,10 +184,10 @@ class TestConflictScenario:
 
 
 class TestAblationNoConflictPrior:
-    """Phase 4 ablation (c): attention comm but b_ij = 0 (no conflict prior).
+    """Disabling the proxy bias isolates the learned attention scores.
 
     With W_q/W_k zeroed the scores are b_ij only, so disabling the prior makes
-    attention uniform over valid receivers, while enabling it (with differing
+    attention uniform over valid senders, while enabling it (with differing
     ttc) makes it non-uniform.
     """
 

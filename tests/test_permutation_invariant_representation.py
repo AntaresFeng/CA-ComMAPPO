@@ -1,17 +1,3 @@
-"""Tests for the PermutationInvariantAttention representation.
-
-These tests pin down the Phase 1 Attention-MAPPO encoder contract:
-
-* the ego vehicle (observation index 0) is the fixed query;
-* the surrounding vehicles (indices 1..V-1) are pooled with a masked attention
-  so the encoding is invariant to their ordering (highway-env shuffles
-  ``obs[1:]`` when ``order == "shuffled"``, and re-sorts them by distance every
-  step otherwise);
-* vehicles flagged ``presence == 0`` are masked out of the attention;
-* the same module handles the actor's single-view input (105-dim) and the
-  MAPPO global-state critic's multi-view input (n_agents * 105).
-"""
-
 from __future__ import annotations
 
 import numpy as np
