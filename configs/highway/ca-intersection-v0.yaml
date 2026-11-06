@@ -4,9 +4,17 @@ duration: 20
 initial_vehicle_count: 0
 spawn_probability: 0
 destination: null
-# Canonical task reward contract validated by the MAPPO baseline. Full-horizon
-# speed shaping stays below the arrival bonus, while a collision remains worse
-# than the other three controlled vehicles arriving.
+access_length: 100.0
+speed_limit: 10.0
+spawn_distance: 40.0
+spawn_spacing: 20.0
+spawn_jitter: 2.0
+initial_speed: 9.0
+minimum_spawn_gap: 10.0
+arrival_distance: 25.0
+perception_distance: 200.0
+controlled_vehicle_specs: null
+# Preserve reward magnitudes; collision now takes precedence over arrival.
 collision_reward: -40
 high_speed_reward: 0.01
 reward_speed_range: [5.0, 9.0]

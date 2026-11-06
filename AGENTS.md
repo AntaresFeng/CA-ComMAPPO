@@ -42,7 +42,7 @@ canonical YAML 冲突，参数以 YAML 为准；若文档与实现冲突，先�
 uv run python main.py sanity --config configs/sanity/highway_intersection.yaml --policy all
 uv run python main.py debug-wrapper --target wrapper --seed 7 --max-steps 1
 uv run python main.py mappo \
-  --config configs/mappo/intersection-multi-agent-v1.yaml \
+  --config configs/mappo/ca-intersection-v0.yaml \
   --smoke --mode train --no-save
 uv run pytest -q
 ```
@@ -61,9 +61,9 @@ uv run pytest -q
 
 - 用户意图清楚时直接实现，保持改动小、可读且符合现有结构。
 - 不编辑 `.venv` 或 XuanCe site-packages；自定义组件通过仓库代码运行时注册或补丁接入。
-- 所有 highway-env 选项通过 `highway_config` 传入；嵌套 `observation` / `action` 依赖
-  项目深度合并，不能直接绕开 adapter 调用。
-- `intersection-multi-agent-v1` 使用 `Discrete(3)`：`0=SLOWER`、`1=IDLE`、
+- 所有 highway-env 选项通过 `highway_config` 传入；嵌套 `observation` / `action`
+  由项目环境子类递归合并；不再重建上游默认配置。
+- `ca-intersection-v0` 使用 `Discrete(3)`：`0=SLOWER`、`1=IDLE`、
   `2=FASTER`。离散 MARL policy 使用 categorical action distribution。
 - `step()` 的 `rewards` 与 `info["agents_rewards"]` 是 masked adapter-facing reward；
   原始 per-agent reward 只在 `info["raw_agents_rewards"]`。

@@ -1,5 +1,10 @@
 # Canonical MAPPO baseline
 
+> 2026-11-06 环境迁移：当前代码与 canonical YAML 已切换至 `ca-intersection-v0`
+> （highway-env 1.12.1），见 [environment.md](environment.md)。下文已有矩阵、冻结配置、
+> 数字和旧命令描述升级前任务；旧命令只能在其对应历史提交执行。新任务尚未训练正式模型，
+> 不能复用旧 checkpoint 或把旧数字当作新任务结果。
+
 本文档定义后续实验和论文统一使用的 MAPPO 基线。该配置来自已验证的 Iteration 5，
 不再以迭代配置维护。
 

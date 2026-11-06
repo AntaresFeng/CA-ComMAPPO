@@ -9,7 +9,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "highway-env==1.11",
+    "highway-env==1.12.1",
     "matplotlib>=3.10, <4.0",
     "xuance==1.4.3",
     "torch>=2.0.0, <3.0.0",

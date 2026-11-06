@@ -14,7 +14,7 @@ uv run python main.py sanity \
 
 # MAPPO smoke
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/mappo/intersection-multi-agent-v1.yaml \
+  --config configs/mappo/ca-intersection-v0.yaml \
   --smoke --mode train --no-save
 
 # 测试
@@ -31,13 +31,14 @@ uv run pytest -q
 
 ```text
 configs/common.yaml
-  + configs/highway/intersection-multi-agent-v1.yaml
-  + configs/<algorithm>/intersection-multi-agent-v1.yaml
+  + configs/highway/ca-intersection-v0.yaml
+  + configs/<algorithm>/ca-intersection-v0.yaml
   + smoke / CLI overrides
 ```
 
-所有 highway-env 参数通过 `highway_config` 传入。正式 MAPPO 基线来自已验证的
-Iteration 5，当前固定为 4 个受控车辆、5 Hz、1M steps、`gamma=0.99`、
+所有 highway-env 参数通过 `highway_config` 传入。旧正式 MAPPO 基线来自已验证的
+Iteration 5；其结果属于升级前任务。新环境使用独立 ID `ca-intersection-v0`（highway-env 1.12.1），
+默认 4 个受控车辆、5 Hz、1M steps、`gamma=0.99`、
 `gae_lambda=0.95`。
 
 ## 文档

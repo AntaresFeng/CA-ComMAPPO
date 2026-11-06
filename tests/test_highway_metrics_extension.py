@@ -33,6 +33,32 @@ def _record(steps, arrived, waiting_steps=None, dt=None):
     )
 
 
+def test_completed_travel_time_uses_each_arrival_and_pools_vehicles():
+    records = []
+    for times in ([1.0, 3.0], [2.0, None], [None, None]):
+        records.append(
+            build_episode_record(
+                episode_index=len(records),
+                steps=20,
+                dt=0.2,
+                agent_rewards={"agent_0": 0, "agent_1": 0},
+                crashed_agents=[False, False],
+                arrived_agents=[value is not None for value in times],
+                truncated=True,
+                arrival_times=times,
+            )
+        )
+    assert records[0]["completed_travel_time"] == 2.0
+    assert records[0]["episode_duration"] == 4.0
+    assert records[2]["completed_travel_time"] is None
+    summary = summarize_episode_records(records)
+    assert summary["mean_completed_travel_time"] == 2.0
+    assert summary["completed_agents"] == 3
+    failed_summary = summarize_episode_records([records[2]])
+    assert failed_summary["completed_agents"] == 0
+    assert "mean_completed_travel_time" not in failed_summary
+
+
 class TestNewMetricsConditional:
     def test_record_has_travel_throughput_waiting_when_dt_and_waiting_given(self):
         record = _record(steps=10, arrived=[True, True], waiting_steps=[2, 4], dt=0.2)

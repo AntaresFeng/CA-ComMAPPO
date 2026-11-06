@@ -1,4 +1,5 @@
 import json
+import math
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ def build_episode_record(
     score: float | None = None,
     waiting_steps: Sequence[float] | None = None,
     dt: float | None = None,
+    arrival_times: Sequence[float | None] | None = None,
 ) -> dict[str, Any]:
     rewards = {agent: float(reward) for agent, reward in agent_rewards.items()}
     num_agents = len(rewards)
@@ -80,12 +82,36 @@ def build_episode_record(
         duration = travel_time
         arrived_count = sum(1 for value in arrived if value)
         throughput = float(arrived_count / duration) if duration > 0 else 0.0
+        # Historical artifacts use this name for episode duration. Actual per-car
+        # completion times are recorded separately to avoid reinterpreting old data.
         record["travel_time"] = travel_time
+        record["episode_duration"] = duration
         record["throughput"] = throughput
         if waiting_steps is not None:
             waiting = [float(value) for value in waiting_steps]
             mean_waiting_steps = sum(waiting) / len(waiting) if waiting else 0.0
             record["waiting_time"] = float(mean_waiting_steps * float(dt))
+    if arrival_times is not None:
+        if len(arrival_times) != num_agents or len(arrived) != num_agents:
+            raise ValueError("arrival_times must contain one value per agent")
+        times = []
+        for reached, value in zip(arrived, arrival_times, strict=True):
+            if reached != (value is not None):
+                raise ValueError(
+                    "arrival_times must be present exactly for arrived agents"
+                )
+            if value is not None:
+                value = float(value)
+                if (
+                    not math.isfinite(value)
+                    or value < 0
+                    or (dt is not None and value > steps * dt + 1e-9)
+                ):
+                    raise ValueError("arrival time must lie within the episode")
+            times.append(value)
+        record["arrival_times"] = times
+        completed = [value for value in times if value is not None]
+        record["completed_travel_time"] = _mean(completed) if completed else None
     return record
 
 
@@ -114,9 +140,19 @@ def summarize_episode_records(records: list[dict[str, Any]]) -> dict[str, float 
         if all(key in record for record in records):
             summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)
     # Phase 4 reporting metrics (conditional; only when every record carries them).
-    for key in ("travel_time", "throughput", "waiting_time"):
+    for key in ("travel_time", "episode_duration", "throughput", "waiting_time"):
         if all(key in record for record in records):
             summary[f"mean_{key}"] = _mean(float(record[key]) for record in records)
+    if all("arrival_times" in record for record in records):
+        completed = [
+            value
+            for record in records
+            for value in record["arrival_times"]
+            if value is not None
+        ]
+        summary["completed_agents"] = len(completed)
+        if completed:
+            summary["mean_completed_travel_time"] = _mean(completed)
     return summary
 
 
@@ -143,6 +179,9 @@ def format_summary_lines(
         "mean_agent_collision_fraction",
         "mean_agent_arrival_fraction",
         "mean_travel_time",
+        "mean_episode_duration",
+        "completed_agents",
+        "mean_completed_travel_time",
         "mean_throughput",
         "mean_waiting_time",
     ]

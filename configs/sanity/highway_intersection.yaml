@@ -1,4 +1,4 @@
-env_id: "intersection-multi-agent-v1"
+env_id: "ca-intersection-v0"
 env_seed: 1
 episodes: 1
 seeds: [1, 2, 3, 4, 5]
@@ -6,4 +6,4 @@ policies: ["random", "idle-only"]
 
 # Reuse the canonical task definition instead of maintaining a second reward
 # snapshot that can drift from learned-policy experiments.
-highway_config_path: "../highway/intersection-multi-agent-v1.yaml"
+highway_config_path: "../highway/ca-intersection-v0.yaml"

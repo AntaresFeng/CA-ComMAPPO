@@ -1,6 +1,6 @@
 # Strict, paired final-test protocol shared with learned-policy validation.
 env_name: "HighwayIntersection"
-env_id: "intersection-multi-agent-v1"
+env_id: "ca-intersection-v0"
 env_seed: 1
 run_seed: 1
 episode_seed_base: 20000
@@ -12,4 +12,4 @@ policies: ["random", "idle-only"]
 
 # Reuse the task definition used by MAPPO instead of duplicating a config that
 # could drift. Paths are resolved relative to this file.
-highway_config_path: "../highway/intersection-multi-agent-v1.yaml"
+highway_config_path: "../highway/ca-intersection-v0.yaml"

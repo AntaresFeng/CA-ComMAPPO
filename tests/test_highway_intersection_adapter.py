@@ -1,7 +1,7 @@
-import json
 from argparse import Namespace
-from pathlib import Path
 
+import numpy as np
+import pytest
 from gymnasium.spaces import Tuple
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, make_envs
 
@@ -12,15 +12,38 @@ from ca_commappo.envs.highway_intersection_wrapper import (
 )
 
 
-def test_default_highway_config_matches_runtime_env_config():
-    expected_config = json.loads(
-        Path("tests/default_config.json").read_text(encoding="utf-8")
+@pytest.mark.parametrize("count", [1, 2, 4, 6, 8])
+def test_population_and_routes_are_valid_across_resets(count):
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(highway_config={"controlled_vehicles": count})
     )
-    env = HighwayIntersectionMultiAgentEnv(Namespace(highway_config={}))
-
     try:
-        assert env.env_id == "intersection-multi-agent-v1"
-        assert env.env.unwrapped.config == expected_config
+        for seed in range(10):
+            obs, info = env.reset(seed=seed)
+            raw = env.env.unwrapped
+            assert len(raw.road.vehicles) == count
+            assert set(raw.controlled_vehicles) == set(raw.road.vehicles)
+            for vehicle, spec in zip(
+                raw.controlled_vehicles, info["agents_navigation"], strict=True
+            ):
+                assert len(vehicle.route) == 3
+                assert spec["entry"] != spec["destination"]
+                assert vehicle.route[-1][1] == f"exit{spec['destination']}"
+                assert vehicle.route[-1][1] not in raw.road.network.graph
+            initial = [v.position.copy() for v in raw.controlled_vehicles]
+            _, _, terminated, _, step_info = env.step(
+                {agent: 1 for agent in env.agents}
+            )
+            assert not any(step_info["crashed"])
+            assert not any(terminated.values())
+            assert all(
+                np.linalg.norm(v.position - pos) > 0
+                for v, pos in zip(raw.controlled_vehicles, initial, strict=True)
+            )
+            replay, replay_info = env.reset(seed=seed)
+            assert replay_info["agents_navigation"] == info["agents_navigation"]
+            for agent in env.agents:
+                np.testing.assert_array_equal(replay[agent], obs[agent])
     finally:
         env.close()
 
@@ -67,7 +90,7 @@ def test_adapter_uses_multi_agent_intersection_by_default():
     )
 
     try:
-        assert env.env_id == "intersection-multi-agent-v1"
+        assert env.env_id == "ca-intersection-v0"
         assert env.num_agents == 3
         assert env.agents == ["agent_0", "agent_1", "agent_2"]
         assert isinstance(env.env.observation_space, Tuple)
@@ -119,7 +142,7 @@ def test_reset_step_and_state_are_xuance_compatible():
     try:
         obs, info = env.reset(seed=0)
         assert set(obs) == set(env.agents)
-        assert info == {}
+        assert info["arrival_times"] == (None, None, None)
         assert env.state().shape == env.state_space.shape
 
         actions = {agent: env.action_space[agent].sample() for agent in env.agents}
@@ -260,163 +283,199 @@ def test_env_seed_is_only_injected_on_first_implicit_reset(monkeypatch):
         env.close()
 
 
+def _place_on_exit(raw, vehicle, destination, longitudinal=26):
+    lane_index = (f"il{destination}", f"exit{destination}", 0)
+    lane = raw.road.network.get_lane(lane_index)
+    vehicle.position = lane.position(longitudinal, 0)
+    vehicle.heading = lane.heading_at(longitudinal)
+    vehicle.lane_index = vehicle.target_lane_index = lane_index
+    vehicle.lane = lane
+    vehicle.route = [lane_index]
+
+
 def test_collision_global_termination_marks_all_agents_done():
     env = HighwayIntersectionMultiAgentEnv(
-        Namespace(
-            highway_config={
-                "controlled_vehicles": 3,
-                "duration": 13,
-                "initial_vehicle_count": 10,
-                "spawn_probability": 0.6,
-                "normalize_reward": False,
-            },
-        )
+        Namespace(highway_config={"controlled_vehicles": 3})
     )
-
     try:
         env.reset(seed=3)
-        terminated = {agent: False for agent in env.agents}
-        step_info = {}
-
-        for _ in range(13):
-            _obs, _rewards, terminated, _truncated, step_info = env.step(
-                {agent: 1 for agent in env.agents}
-            )
-            if step_info["rewards"]["collision_reward"] > 0:
-                break
-
-        assert step_info["rewards"]["collision_reward"] > 0
-        assert all(terminated.values())
+        raw = env.env.unwrapped
+        victim = raw.controlled_vehicles[1]
+        _place_on_exit(raw, victim, raw._vehicle_specs[victim]["destination"])
+        victim.crashed = True
+        _, rewards, terminated, _, info = env.step({agent: 1 for agent in env.agents})
+        assert info["crashed"] == (False, True, False)
+        assert not info["arrived"][1]
+        assert info["arrival_times"][1] is None
+        assert rewards["agent_1"] == -40
+        assert info["global_terminated"] and all(terminated.values())
     finally:
         env.close()
 
 
-def test_arrival_rewards_and_termination_match_highway_info():
+def test_terminal_agents_are_masked_and_retired_after_destination_arrival():
     env = HighwayIntersectionMultiAgentEnv(
-        Namespace(
-            highway_config={
-                "controlled_vehicles": 3,
-                "duration": 13,
-                "initial_vehicle_count": 10,
-                "spawn_probability": 0.6,
-                "normalize_reward": False,
-            },
-        )
+        Namespace(highway_config={"controlled_vehicles": 2})
     )
-
     try:
         env.reset(seed=1)
-        partial_arrival = None
-        final_arrival = None
-
-        for _ in range(13):
-            _obs, rewards, terminated, truncated, step_info = env.step(
-                {agent: 1 for agent in env.agents}
-            )
-            arrived_ratio = step_info["rewards"]["arrived_reward"]
-            if 0 < arrived_ratio < 1 and partial_arrival is None:
-                partial_arrival = rewards, terminated, truncated, step_info
-            if step_info["global_terminated"]:
-                final_arrival = rewards, terminated, truncated, step_info
-                break
-
-        assert partial_arrival is not None
-        rewards, terminated, truncated, step_info = partial_arrival
-        assert not truncated
-        assert not step_info["global_terminated"]
-        assert step_info["agents_terminated"] == (False, True, True)
-        assert step_info["arrived"] == (False, True, True)
-        assert terminated == {
-            "agent_0": False,
-            "agent_1": True,
-            "agent_2": True,
-        }
-        assert (
-            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
-        )
-        assert step_info["agents_rewards"] == (1.0, 1, 1)
-        assert step_info["raw_agents_rewards"] == (1.0, 1, 1)
-
-        assert final_arrival is not None
-        rewards, terminated, truncated, step_info = final_arrival
-        assert not truncated
-        assert step_info["global_terminated"]
-        assert step_info["agents_terminated"] == (True, True, True)
-        assert step_info["arrived"] == (True, True, True)
-        assert terminated == {
-            "agent_0": True,
-            "agent_1": True,
-            "agent_2": True,
-        }
-        assert (
-            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
-        )
-        assert step_info["agents_rewards"] == (1, 0.0, 0.0)
-        assert step_info["raw_agents_rewards"] == (1, 1, 1)
+        raw = env.env.unwrapped
+        first, second = raw.controlled_vehicles
+        destination = raw._vehicle_specs[first]["destination"]
+        _place_on_exit(raw, first, (destination + 1) % 4)
+        assert not raw.has_arrived(first)
+        _place_on_exit(raw, first, destination)
+        _, rewards, terminated, _, info = env.step({agent: 1 for agent in env.agents})
+        assert rewards["agent_0"] == 10
+        assert terminated == {"agent_0": True, "agent_1": False}
+        assert env.agent_mask() == {"agent_0": True, "agent_1": True}
+        assert info["next_agent_mask"] == {"agent_0": False, "agent_1": True}
+        assert info["arrival_times"] == (0.2, None)
+        assert first not in raw.road.vehicles and second in raw.road.vehicles
+        position = first.position.copy()
+        target_speed = first.target_speed
+        _, rewards, _, _, info = env.step({"agent_0": 2, "agent_1": 1})
+        assert rewards["agent_0"] == info["raw_agents_rewards"][0] == 0
+        assert env.agent_mask() == {"agent_0": False, "agent_1": True}
+        assert info["arrival_times"] == (0.2, None)
+        np.testing.assert_array_equal(first.position, position)
+        assert first.target_speed == target_speed
+        _place_on_exit(raw, second, raw._vehicle_specs[second]["destination"])
+        _, rewards, terminated, _, info = env.step({"agent_1": 1})
+        assert rewards == {"agent_0": 0, "agent_1": 10}
+        assert info["arrived"] == (True, True)
+        assert info["arrival_times"] == pytest.approx((0.2, 0.6))
+        assert info["global_terminated"] and all(terminated.values())
+        _, info = env.reset(seed=1)
+        assert info["arrival_times"] == (None, None)
+        assert len(raw.road.vehicles) == 2
     finally:
         env.close()
 
 
-def test_terminal_agents_are_masked_and_stop_receiving_rewards_after_arrival():
+def test_explicit_scenario_controls_spawn_route_and_rejects_overlap():
+    specs = [
+        {"entry": 0, "destination": 2, "longitudinal": 50, "speed": 4.5},
+        {"entry": 0, "destination": 1, "longitudinal": 25, "speed": 9},
+    ]
     env = HighwayIntersectionMultiAgentEnv(
         Namespace(
             highway_config={
-                "controlled_vehicles": 3,
-                "duration": 13,
-                "initial_vehicle_count": 10,
-                "spawn_probability": 0.6,
-                "normalize_reward": False,
-            },
+                "controlled_vehicles": 2,
+                "controlled_vehicle_specs": specs,
+                "access_length": 120,
+                "perception_distance": 10,
+            }
         )
     )
-
     try:
-        env.reset(seed=1)
-        partial_arrival = None
-
-        for _ in range(13):
-            _obs, _rewards, terminated, _truncated, step_info = env.step(
-                {agent: 1 for agent in env.agents}
+        obs, info = env.reset(seed=7)
+        raw = env.env.unwrapped
+        assert info["agents_navigation"] == tuple(specs)
+        for vehicle, spec in zip(raw.controlled_vehicles, specs, strict=True):
+            assert vehicle.lane.local_coordinates(vehicle.position)[0] == pytest.approx(
+                spec["longitudinal"]
             )
-            if 0 < step_info["rewards"]["arrived_reward"] < 1:
-                partial_arrival = terminated, env.agent_mask()
+            assert vehicle.speed == spec["speed"]
+            assert vehicle.route[-1][1] == f"exit{spec['destination']}"
+        assert all(view[:, 0].sum() == 1 for view in obs.values())
+        with pytest.raises(ValueError, match="minimum_spawn_gap"):
+            env.reset(
+                options={"config": {"controlled_vehicle_specs": [specs[0], specs[0]]}}
+            )
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize(
+    "overrides,match",
+    [
+        (
+            {
+                "controlled_vehicle_specs": [
+                    {"entry": 0, "destination": 0, "longitudinal": 50, "speed": 9}
+                ]
+            },
+            "destination",
+        ),
+        (
+            {
+                "controlled_vehicle_specs": [
+                    {"entry": 0, "destination": 1, "longitudinal": -1, "speed": 9}
+                ]
+            },
+            "longitudinal",
+        ),
+        ({"controlled_vehicle_specs": []}, "one entry"),
+        ({"spawn_spacing": 5}, "spawn_spacing"),
+        ({"controlled_vehicles": 0}, "positive"),
+    ],
+)
+def test_invalid_scenarios_fail_before_training(overrides, match):
+    with pytest.raises(ValueError, match=match):
+        HighwayIntersectionMultiAgentEnv(
+            Namespace(highway_config={"controlled_vehicles": 1, **overrides})
+        )
+
+
+def test_background_population_is_explicit_and_does_not_remove_controlled_vehicles():
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            highway_config={
+                "controlled_vehicles": 2,
+                "initial_vehicle_count": 5,
+                "spawn_probability": 0,
+            }
+        )
+    )
+    try:
+        env.reset(seed=4)
+        raw = env.env.unwrapped
+        assert len(raw.road.vehicles) == 7
+        for _ in range(3):
+            env.step({agent: 1 for agent in env.agents})
+        assert len(raw.road.vehicles) == 7
+        assert all(v in raw.road.vehicles for v in raw.controlled_vehicles)
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize(
+    "entry,destination", [(i, j) for i in range(4) for j in range(4) if i != j]
+)
+def test_all_movements_drive_to_their_destination(entry, destination):
+    env = HighwayIntersectionMultiAgentEnv(
+        Namespace(
+            highway_config={
+                "controlled_vehicles": 1,
+                "controlled_vehicle_specs": [
+                    {
+                        "entry": entry,
+                        "destination": destination,
+                        "longitudinal": 60,
+                        "speed": 9,
+                    }
+                ],
+            }
+        )
+    )
+    try:
+        env.reset(seed=7)
+        arrival_rewards = 0
+        for step in range(1, env.max_episode_steps + 1):
+            _, rewards, terminated, truncated, info = env.step({"agent_0": 1})
+            if rewards["agent_0"] == 10:
+                arrival_rewards += 1
+            if terminated["agent_0"] or truncated:
                 break
-
-        assert partial_arrival is not None
-        terminated, agent_mask = partial_arrival
-        assert terminated == {
-            "agent_0": False,
-            "agent_1": True,
-            "agent_2": True,
-        }
-        assert agent_mask == {agent: True for agent in env.agents}
-        assert step_info["next_agent_mask"] == {
-            "agent_0": True,
-            "agent_1": False,
-            "agent_2": False,
-        }
-
-        _obs, rewards, _terminated, _truncated, step_info = env.step(
-            {agent: 1 for agent in env.agents}
-        )
-
-        assert env.agent_mask() == {
-            "agent_0": True,
-            "agent_1": False,
-            "agent_2": False,
-        }
-        assert step_info["next_agent_mask"] == {
-            "agent_0": False,
-            "agent_1": False,
-            "agent_2": False,
-        }
-        assert rewards["agent_1"] == 0.0
-        assert rewards["agent_2"] == 0.0
+        assert info["arrived"] == (True,)
+        assert info["crashed"] == (False,)
+        assert info["arrival_times"] == pytest.approx((step / 5,))
+        assert arrival_rewards == 1
         assert (
-            tuple(rewards[agent] for agent in env.agents) == step_info["agents_rewards"]
+            env.env.unwrapped.controlled_vehicles[0].lane_index[1]
+            == f"exit{destination}"
         )
-        assert step_info["agents_rewards"] == (1, 0.0, 0.0)
-        assert step_info["raw_agents_rewards"] == (1, 1, 1)
     finally:
         env.close()
 

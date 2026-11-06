@@ -177,6 +177,7 @@ def _collect_single_trace_episode(
         score=sum(agent_rewards.values()) / len(agent_rewards),
         waiting_steps=latest_info.get("waiting_steps"),
         dt=latest_info.get("dt"),
+        arrival_times=latest_info.get("arrival_times"),
     )
     return {
         "schema_version": CA_TRACE_SCHEMA_VERSION,

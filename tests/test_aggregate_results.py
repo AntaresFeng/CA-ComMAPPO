@@ -99,7 +99,7 @@ def _write_run(
     records: list[dict],
     *,
     metadata_mode: str = "test",
-    env_id: str = "intersection-multi-agent-v1",
+    env_id: str = "ca-intersection-v0",
     highway_config: dict | None = None,
     evaluation_parallels: int = 10,
     config_overrides: dict | None = None,

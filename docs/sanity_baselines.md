@@ -1,5 +1,9 @@
 # Sanity baseline 协议
 
+> 环境迁移说明：当前命令使用 `ca-intersection-v0` / highway-env 1.12.1。
+> 本文引用的已有训练数字与 checkpoint 均属于旧 1.11 四车任务，不能直接迁移；
+> 新环境语义见 [environment.md](environment.md)。
+
 本文定义 random 与 idle-only 两个非学习策略的用途、复现方式和正式结果。它们用于
 验证环境和指标下界，不是训练 seed，也不应复制成伪造的跨 seed 样本。
 

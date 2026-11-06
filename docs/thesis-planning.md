@@ -1,5 +1,10 @@
 # 论文实验主线
 
+> 2026-11-06 环境迁移：当前代码与 canonical YAML 已切换至 `ca-intersection-v0`
+> （highway-env 1.12.1），见 [environment.md](environment.md)。下文已有矩阵、冻结配置、
+> 数字和旧命令描述升级前任务；旧命令只能在其对应历史提交执行。新任务尚未训练正式模型，
+> 不能复用旧 checkpoint 或把旧数字当作新任务结果。
+
 本文只回答“论文要比较什么、验证什么、还缺什么”。固定 MAPPO 任务合同见
 [`mappo_baseline.md`](mappo_baseline.md)，执行方式见
 [`experiments_runbook.md`](experiments_runbook.md)，当前实验全景和 artifact 入口见

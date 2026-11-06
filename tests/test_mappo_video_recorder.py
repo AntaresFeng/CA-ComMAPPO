@@ -573,7 +573,7 @@ def test_write_video_eval_summary_persists_contract(tmp_path):
         payload={
             "schema_version": 1,
             "model_path": "models/best_model.pth",
-            "config_path": "configs/mappo/intersection-multi-agent-v1.yaml",
+            "config_path": "configs/mappo/ca-intersection-v0.yaml",
             "video_files": ["episode-0.mp4"],
             "records": [{"episode_index": 0, "arrival": True}],
             "summary": {"episodes": 1, "arrival_rate": 1.0},

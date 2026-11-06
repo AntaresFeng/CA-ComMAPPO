@@ -1,7 +1,12 @@
 # 实验执行手册
 
-本文只描述当前代码已经支持的可复现实验流程。任务与 MAPPO 超参以
-[`mappo_baseline.md`](mappo_baseline.md) 为准；当前矩阵、证据状态和结果入口见
+> 环境迁移说明：当前命令使用 `ca-intersection-v0` / highway-env 1.12.1。
+> 本文引用的已有训练数字与 checkpoint 均属于旧 1.11 四车任务，不能直接迁移；
+> 新环境语义见 [environment.md](environment.md)。
+
+本文只描述当前代码已经支持的可复现实验流程。任务以
+[`environment.md`](environment.md) 和 `configs/highway/ca-intersection-v0.yaml` 为准，
+训练超参见 `configs/common.yaml`；当前矩阵、证据状态和结果入口见
 [`current_experiment_status.md`](current_experiment_status.md)。
 
 ## 不可变规则
@@ -43,15 +48,24 @@ export PYTHONUNBUFFERED=1
 
 ## 配置矩阵
 
+环境升级后可先执行已验证的八车短检查：
+
+```bash
+uv run python main.py debug-wrapper --target wrapper --seed 7 \
+  --controlled-vehicles 8 --max-steps 5
+```
+
+出生点、路线和感知半径配置见 [environment.md](environment.md)。
+
 | 论文名称 | 配置 | 说明 |
 | --- | --- | --- |
-| IPPO | `configs/ippo/intersection-multi-agent-v1.yaml` | 无 centralized critic |
-| MAPPO | `configs/mappo/intersection-multi-agent-v1.yaml` | canonical MLP baseline |
-| Attention-MAPPO | `configs/attention_mappo/intersection-multi-agent-v1.yaml` | PI social encoder |
-| CommNet | `configs/commnet/intersection-multi-agent-v1.yaml` | 平均通信、RNN backbone |
-| IC3Net | `configs/ic3net/intersection-multi-agent-v1.yaml` | 门控通信、RNN backbone |
-| CA-ComMAPPO | `configs/ca_commappo/intersection-multi-agent-v1.yaml` | 完整方法；正式结果限于四车合同 |
-| CA-ComMAPPO no-prior | `configs/ca_commappo/intersection-multi-agent-v1-no-prior.yaml` | `b_ij=0` 消融 |
+| IPPO | `configs/ippo/ca-intersection-v0.yaml` | 无 centralized critic |
+| MAPPO | `configs/mappo/ca-intersection-v0.yaml` | canonical MLP baseline |
+| Attention-MAPPO | `configs/attention_mappo/ca-intersection-v0.yaml` | PI social encoder |
+| CommNet | `configs/commnet/ca-intersection-v0.yaml` | 平均通信、RNN backbone |
+| IC3Net | `configs/ic3net/ca-intersection-v0.yaml` | 门控通信、RNN backbone |
+| CA-ComMAPPO | `configs/ca_commappo/ca-intersection-v0.yaml` | 完整方法；正式结果限于四车合同 |
+| CA-ComMAPPO no-prior | `configs/ca_commappo/ca-intersection-v0-no-prior.yaml` | `b_ij=0` 消融 |
 
 CommNet / IC3Net 的 backbone 与 CA-ComMAPPO 不同，比较时不得把全部差异归因于通信
 聚合。CA-ComMAPPO 的规模泛化边界不影响当前四车合同，但禁止外推到其他车辆数。
@@ -62,7 +76,7 @@ CommNet / IC3Net 的 backbone 与 CA-ComMAPPO 不同，比较时不得把全部�
 
 ```bash
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --smoke --mode train --no-save
 ```
 
@@ -71,11 +85,11 @@ WANDB_MODE=offline uv run python main.py mappo \
 
 ```bash
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --smoke --mode benchmark
 
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --smoke --mode test --seed 1 \
   --model-dir-load runs/<output>/<benchmark-run>/models/best_model.pth \
   --test-episode 1
@@ -100,7 +114,7 @@ export PYTHONUNBUFFERED=1
 
 set -o pipefail
 uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --mode benchmark --seed 1 --device cuda:0 \
   2>&1 | tee runs/launch_logs/<algo>-seed1.log
 ```
@@ -135,7 +149,7 @@ runs/<algorithm>_highway/<timestamp>_benchmark_seed_<seed>/
 
 ```bash
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --mode test --seed <training-seed> \
   --model-dir-load runs/<algorithm>_highway/<benchmark-run>/models/best_model.pth \
   --test-episode 100 \
@@ -164,7 +178,7 @@ checkpoint：
 
 ```bash
 WANDB_MODE=offline uv run python main.py mappo \
-  --config configs/<algorithm>/intersection-multi-agent-v1.yaml \
+  --config configs/<algorithm>/ca-intersection-v0.yaml \
   --mode order-eval --seed 1 \
   --model-dir-load runs/<algorithm>_highway/<benchmark-run>/models/best_model.pth
 ```
@@ -183,12 +197,12 @@ ego、global state 和 agent mask 不变。run 输出 `order_robustness_metadata
 ```bash
 WANDB_MODE=offline MPLCONFIGDIR=/tmp/ca-commappo-mpl-cache \
 uv run python main.py mappo \
-  --config configs/ca_commappo/intersection-multi-agent-v1.yaml \
+  --config configs/ca_commappo/ca-intersection-v0.yaml \
   --mode ca-trace --seed 1 \
   --model-dir-load runs/ca_commappo_highway/<benchmark-run>/models/best_model.pth
 ```
 
-no-prior 只替换为 `intersection-multi-agent-v1-no-prior.yaml`。正式模式固定 cases
+no-prior 只替换为 `ca-intersection-v0-no-prior.yaml`。正式模式固定 cases
 `20000..20009`，要求严格 provenance v2、训练 seed 1 和干净源码。只读 trace 逐动作
 导出 active mask、scaled TTC、intent、effective lambda、attention、动作、normalized
 ego 轨迹和结局，输出 `ca_trace_metadata.json`、`ca_trace_records.jsonl`、

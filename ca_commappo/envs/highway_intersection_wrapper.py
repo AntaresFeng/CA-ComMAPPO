@@ -1,66 +1,25 @@
-from copy import deepcopy
 from typing import Any
 
 import gymnasium as gym
 import highway_env  # noqa: F401 - importing registers highway-env ids.
 import numpy as np
 from gymnasium import spaces
-from highway_env.envs.intersection_env import IntersectionEnv, MultiAgentIntersectionEnv
+from highway_env.envs.intersection_env import IntersectionEnv
 from xuance.environment import REGISTRY_MULTI_AGENT_ENV, RawMultiAgentEnv
 
+from ca_commappo.envs.intersection import PROJECT_ENV_ID, ResearchIntersectionEnv
+
 DEFAULT_ENV_NAME = "HighwayIntersection"
-DEFAULT_HIGHWAY_ENV_ID = "intersection-multi-agent-v1"
+DEFAULT_HIGHWAY_ENV_ID = PROJECT_ENV_ID
 IDLE_ACTION = IntersectionEnv.ACTIONS_INDEXES["IDLE"]  # 1: "IDLE"
-# A controlled vehicle is counted as "waiting" while its speed is below this
-# threshold (m/s). Used for the Phase 4 mean_waiting_time metric.
+# Speeds below this threshold (m/s) count toward waiting time.
 WAITING_SPEED_THRESHOLD = 1.0
-
-
-def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    merged = deepcopy(base)
-    for key, value in overrides.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge(merged[key], value)
-        else:
-            merged[key] = deepcopy(value)
-    return merged
-
-
-def _highway_multi_agent_intersection_defaults() -> dict[str, Any]:
-    intersection_config = IntersectionEnv.default_config()
-    multi_agent_config = MultiAgentIntersectionEnv.default_config()
-    config = _deep_merge(intersection_config, multi_agent_config)
-    config["observation"] = _deep_merge(
-        {
-            "type": multi_agent_config["observation"]["type"],
-            "observation_config": intersection_config["observation"],
-        },
-        multi_agent_config["observation"],
-    )
-    config["action"] = _deep_merge(
-        {
-            "type": multi_agent_config["action"]["type"],
-            "action_config": intersection_config["action"],
-        },
-        multi_agent_config["action"],
-    )
-    return config
 
 
 def build_intersection_config(
     highway_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a complete multi-agent config for highway-env intersection.
-
-    highway-env 1.11 applies user config with a shallow top-level update, so the
-    adapter must create complete nested `observation` and `action` dictionaries
-    before calling `gym.make`.
-    """
-    base_config = _highway_multi_agent_intersection_defaults()
-    config = _deep_merge(base_config, highway_config or {})
-    if int(config["controlled_vehicles"]) <= 0:
-        raise ValueError("controlled_vehicles must be a positive integer")
-    return config
+    return ResearchIntersectionEnv.resolve_config(highway_config)
 
 
 class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
@@ -80,8 +39,11 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self.agents = [f"agent_{i}" for i in range(self.num_agents)]
         self.agent_groups = [self.agents]
         self.env = gym.make(
-            self.env_id, config=self.config, render_mode=self.render_mode
+            self.env_id,
+            config=highway_config if self.env_id == PROJECT_ENV_ID else self.config,
+            render_mode=self.render_mode,
         )
+        self.config = self.env.unwrapped.config
         self._validate_multi_agent_spaces()
 
         self.observation_space = self._build_observation_space()
@@ -212,7 +174,7 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             and self._initial_seed is not None
         ):
             kwargs["seed"] = self._initial_seed
-        observation, _info = self.env.reset(**kwargs)
+        observation, info = self.env.reset(**kwargs)
         self._has_reset = True
         obs_dict = self._obs_tuple_to_agent_dict(observation)
         self._active_agents = self._all_agents_active()
@@ -221,12 +183,12 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         self._episode_step = 0
         self._waiting_steps = {agent: 0 for agent in self.agents}
         self._remember_obs(obs_dict)
-        return obs_dict, {}
+        return obs_dict, info
 
     def step(self, action_dict: dict[str, Any]):
         active_before_step = dict(self._active_agents)
         action_tuple = self._actions_to_tuple(action_dict, active_before_step)
-        # intersection-multi-agent-v1's MultiAgentWrapper returns per-agent
+        # MultiAgentWrapper returns per-agent
         # tuples for reward and terminated directly from step().
         observation, reward, terminated, truncated, info = self.env.step(action_tuple)
         self._episode_step += 1
@@ -260,7 +222,9 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
             agent: not active_before_step[agent] or bool(raw_terminated[agent])
             for agent in self.agents
         }
-        info["global_terminated"] = any(crashed) or all(arrived)
+        info["global_terminated"] = (
+            bool(info.get("global_terminated", False)) or any(crashed) or all(arrived)
+        )
         if info["global_terminated"]:
             terminated = {agent: True for agent in self.agents}
         info["raw_agents_rewards"] = tuple(raw_rewards[agent] for agent in self.agents)
@@ -280,9 +244,8 @@ class HighwayIntersectionMultiAgentEnv(RawMultiAgentEnv):
         info["crashed"] = crashed
         info["current_arrived"] = current_arrived
         info["arrived"] = arrived
-        # Phase 4 reporting: per-agent speed (m/s) and accumulated low-speed
-        # step count. Only accumulate for agents that were active *before* this
-        # step (post-termination IDLE steps do not count as waiting).
+        # Count the transition that ends an agent's episode, excluding later
+        # placeholder actions from its waiting time.
         agents_speeds = tuple(
             float(v.speed) for v in self.env.unwrapped.controlled_vehicles
         )

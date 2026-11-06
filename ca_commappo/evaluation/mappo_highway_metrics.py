@@ -217,6 +217,7 @@ def _episode_record_from_info(
         env_id=env_id,
         waiting_steps=info.get("waiting_steps"),
         dt=info.get("dt"),
+        arrival_times=info.get("arrival_times"),
     )
 
 

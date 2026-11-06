@@ -1,7 +1,11 @@
 # CA-ComMAPPO 算法设计
 
+> 环境迁移说明：当前命令使用 `ca-intersection-v0` / highway-env 1.12.1。
+> 本文引用的已有训练数字与 checkpoint 均属于旧 1.11 四车任务，不能直接迁移；
+> 新环境语义见 [environment.md](environment.md)。
+
 本文只定义 CA-ComMAPPO 的算法语义、当前代码映射和已知边界。共享任务与训练
-超参由 [`mappo_baseline.md`](mappo_baseline.md) 冻结，实验操作见
+超参来自 `configs/common.yaml`；旧基线来源见 [`mappo_baseline.md`](mappo_baseline.md)，实验操作见
 [`experiments_runbook.md`](experiments_runbook.md)。
 
 ## 研究定位
@@ -86,7 +90,7 @@ evaluator 另外记录动作、normalized ego 轨迹、reward 和结局，并只
 
 - 当前观测特征为 `presence,x,y,vx,vy,cos_h,sin_h`，第 0 行是 ego。
 - `absolute: false` 时 ego 行仍表示归一化世界坐标，其他车辆相对 ego；TTC 代理依赖
-  这一 highway-env 1.11 行为。
+  这一 Kinematics ego 行约定。
 - 冲突点只取路口中心，不能表达出口汇流、车道级交叉点或真实 route priority。
 - 正式配置使用 4 个受控 agent。至少 3 个 agent 才能让每个接收方在两个候选发送方
   之间产生有信息量的 softmax；2-agent 设置下冲突先验无法改变唯一邻居的权重。

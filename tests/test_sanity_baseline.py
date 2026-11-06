@@ -35,9 +35,7 @@ STRICT_CONFIG = Path("configs/sanity/highway_intersection_final.yaml")
 def test_strict_config_reuses_task_config_and_defines_exact_final_seeds():
     config = load_sanity_config(STRICT_CONFIG)
     canonical_highway_config = yaml.safe_load(
-        Path("configs/highway/intersection-multi-agent-v1.yaml").read_text(
-            encoding="utf-8"
-        )
+        Path("configs/highway/ca-intersection-v0.yaml").read_text(encoding="utf-8")
     )
 
     assert config.episode_seed_base == 20_000

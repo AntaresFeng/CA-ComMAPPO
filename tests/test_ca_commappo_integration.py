@@ -16,8 +16,8 @@ from ca_commappo.xuance_compat import (
 
 def test_ca_commappo_real_env_action_and_minibatch_update(tmp_path):
     configs = load_configs(
-        "intersection-multi-agent-v1",
-        config_path="configs/ca_commappo/intersection-multi-agent-v1.yaml",
+        "ca-intersection-v0",
+        config_path="configs/ca_commappo/ca-intersection-v0.yaml",
         smoke=True,
     )
     configs.log_dir = str(tmp_path / "logs")

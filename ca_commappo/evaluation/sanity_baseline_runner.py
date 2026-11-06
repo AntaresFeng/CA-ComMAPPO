@@ -152,6 +152,7 @@ def run_episode(
             score=float(sum(agent_rewards.values()) / len(agent_rewards)),
             waiting_steps=info.get("waiting_steps"),
             dt=info.get("dt"),
+            arrival_times=info.get("arrival_times"),
         )
     finally:
         env.close()

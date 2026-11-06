@@ -225,7 +225,7 @@ def test_write_rejects_invalid_training_environment_seed_mapping(tmp_path):
 def test_ippo_formal_env_construction_preserves_provenance_seed(tmp_path):
     configs = load_configs(
         DEFAULT_HIGHWAY_ENV_ID,
-        config_path="configs/ippo/intersection-multi-agent-v1.yaml",
+        config_path="configs/ippo/ca-intersection-v0.yaml",
         overrides={"seed": 1, "parallels": 2},
     )
     configs.model_dir = str(tmp_path / "models")
@@ -302,7 +302,17 @@ def test_load_rejects_checkpoint_modified_after_sidecar_write(tmp_path):
         load_model_provenance(model_path=model_path, expected_training_seed=3)
 
 
-def test_load_rejects_test_config_that_differs_from_training_contract(tmp_path):
+@pytest.mark.parametrize(
+    "changed",
+    [
+        {"learning_rate": 1e-4},
+        {"env_id": "ca-intersection-v0"},
+        {"highway_config": {"spawn_spacing": 30}},
+    ],
+)
+def test_load_rejects_test_config_that_differs_from_training_contract(
+    tmp_path, changed
+):
     model_path = _write_checkpoint(tmp_path)
     training_configs = _configs(tmp_path)
     write_best_model_provenance(
@@ -314,7 +324,8 @@ def test_load_rejects_test_config_that_differs_from_training_contract(tmp_path):
         selection_protocol=_selection_protocol(),
     )
     test_configs = _configs(tmp_path)
-    test_configs.learning_rate = 1e-4
+    for key, value in changed.items():
+        setattr(test_configs, key, value)
 
     with pytest.raises(ValueError, match="training contract"):
         load_model_provenance(

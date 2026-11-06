@@ -93,7 +93,7 @@ def test_json_safe_recursively_converts_unwrapped_numpy_scalar_values():
 def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=1,
         logger="tensorboard",
         running_steps=16,
@@ -121,7 +121,7 @@ def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):
     assert metadata["mode"] == "benchmark"
     assert metadata["log_dir"] == str(tmp_path / "seed_1_run")
     assert metadata["env_name"] == "HighwayIntersection"
-    assert metadata["env_id"] == "intersection-multi-agent-v1"
+    assert metadata["env_id"] == "ca-intersection-v0"
     assert metadata["seed"] == 1
     assert metadata["logger"] == "tensorboard"
     assert metadata["config"]["custom_path"] == "models/run"
@@ -132,7 +132,7 @@ def test_build_eval_metadata_keeps_full_config_under_config(tmp_path):
 def test_build_eval_metadata_supports_requested_positional_signature(tmp_path):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=2,
         logger="tensorboard",
     )
@@ -298,7 +298,7 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
 ):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=3,
         env_seed=21,
         logger="tensorboard",
@@ -367,7 +367,7 @@ def test_benchmark_writes_metadata_once_and_appends_initial_and_epoch_records(
 def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypatch):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=3,
         logger="tensorboard",
         running_steps=16,
@@ -402,7 +402,7 @@ def test_benchmark_closes_test_env_when_metadata_write_fails(tmp_path, monkeypat
 def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=3,
         logger="tensorboard",
         test_episode=8,
@@ -462,7 +462,7 @@ def test_test_mode_calls_video_recorder_when_enabled(tmp_path, monkeypatch):
 def test_test_mode_skips_video_recorder_by_default(tmp_path, monkeypatch):
     configs = Namespace(
         env_name="HighwayIntersection",
-        env_id="intersection-multi-agent-v1",
+        env_id="ca-intersection-v0",
         seed=3,
         logger="tensorboard",
         test_episode=1,

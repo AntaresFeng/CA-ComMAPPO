@@ -277,6 +277,7 @@ def record_mappo_policy_videos(
                     score=_mean_agent_reward(agent_rewards),
                     waiting_steps=latest_info.get("waiting_steps"),
                     dt=latest_info.get("dt"),
+                    arrival_times=latest_info.get("arrival_times"),
                 )
             )
     finally:
